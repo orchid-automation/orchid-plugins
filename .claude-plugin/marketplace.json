@@ -1,0 +1,21 @@
+{
+  "name": "orchid-plugins",
+  "owner": {
+    "name": "Orchid Automation",
+    "email": "hello@orchidautomation.com"
+  },
+  "plugins": [
+    {
+      "name": "session",
+      "source": "./plugins/session",
+      "description": "Developer productivity tools for analyzing coding sessions, tracking accomplishments, and knowing when to take a break",
+      "version": "1.0.0",
+      "author": {
+        "name": "Orchid Automation"
+      },
+      "homepage": "https://github.com/orchid-automation/orchid-plugins",
+      "license": "MIT",
+      "keywords": ["productivity", "git", "vibecheck", "session-analysis"]
+    }
+  ]
+}
