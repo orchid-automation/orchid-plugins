@@ -76,6 +76,27 @@ Analyze your git commit history and get a comprehensive productivity report.
 - Git repository with commit history
 - Claude Code with Task tool access
 
+## Verify Installation
+
+```bash
+# Check installed plugins
+/plugin list
+```
+
+You should see `session` in the list.
+
+## Troubleshooting
+
+```bash
+# Remove and reinstall
+/plugin uninstall session@orchid-plugins
+/plugin install session@orchid-plugins
+
+# Remove marketplace entirely and re-add
+/plugin marketplace remove orchid-plugins
+/plugin marketplace add orchid-automation/orchid-plugins
+```
+
 ## License
 
 MIT

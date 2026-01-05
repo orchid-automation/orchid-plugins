@@ -22,6 +22,25 @@ Or install directly:
 /plugin install <plugin-name>@orchid-plugins
 ```
 
+## Verify Installation
+
+```bash
+# Check installed plugins
+/plugin list
+```
+
+## Troubleshooting
+
+```bash
+# Remove and reinstall a plugin
+/plugin uninstall <plugin-name>@orchid-plugins
+/plugin install <plugin-name>@orchid-plugins
+
+# Remove marketplace entirely and re-add
+/plugin marketplace remove orchid-plugins
+/plugin marketplace add orchid-automation/orchid-plugins
+```
+
 ## Available Plugins
 
 ### session
