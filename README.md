@@ -56,6 +56,20 @@ Developer productivity tools for analyzing coding sessions.
 
 [View documentation](./plugins/session/README.md)
 
+### feature-map
+
+Point at any codebase and generate a GTM-focused feature map. Translates technical capabilities into buyer outcomes, business lift, and competitive positioning using a team of parallel agents.
+
+```bash
+/plugin install feature-map@orchid-plugins
+```
+
+**Skills:**
+- `/feature-map ProductName` - Auto-infers ICP and competitors from codebase, deploys 3-4 agents in parallel, produces a master buyer-focused document
+- `/feature-map ProductName "target buyer" "Competitor1, Competitor2"` - With explicit buyer and competitor context
+
+[View documentation](./plugins/feature-map/README.md)
+
 ---
 
 ## Contributing

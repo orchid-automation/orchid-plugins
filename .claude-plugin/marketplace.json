@@ -16,6 +16,18 @@
       "homepage": "https://github.com/orchid-automation/orchid-plugins",
       "license": "MIT",
       "keywords": ["productivity", "git", "vibecheck", "session-analysis"]
+    },
+    {
+      "name": "feature-map",
+      "source": "./plugins/feature-map",
+      "description": "Point at any codebase and generate a GTM-focused feature map. Translates technical capabilities into buyer outcomes, business lift, and competitive positioning using a team of parallel agents.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Orchid Automation"
+      },
+      "homepage": "https://github.com/orchid-automation/orchid-plugins",
+      "license": "MIT",
+      "keywords": ["gtm", "feature-map", "product-marketing", "competitive-analysis", "sales-enablement", "positioning"]
     }
   ]
 }
