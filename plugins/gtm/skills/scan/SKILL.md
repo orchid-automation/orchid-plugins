@@ -3,6 +3,7 @@ name: scan
 description: Scan any codebase and map all technical capabilities into a structured inventory with counts, categories, and file references. Produces a GTM-ready feature inventory that downstream skills consume for market research, positioning, and asset generation.
 context: fork
 agent: Explore
+user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash
 ---

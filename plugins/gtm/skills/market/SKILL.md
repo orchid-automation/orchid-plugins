@@ -3,6 +3,7 @@ name: market
 description: Research ICP, competitors, and market sizing for a product based on its codebase scan. Determines who buys, who competes, and how big the opportunity is. Reads the scan output and produces a structured market intelligence document.
 context: fork
 agent: market-researcher
+user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
 ---
