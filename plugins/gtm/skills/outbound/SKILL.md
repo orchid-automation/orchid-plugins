@@ -1,8 +1,6 @@
 ---
 name: outbound
 description: Build ABM target account lists and personalized cold email sequences from ICP and positioning strategy. Researches companies matching ICP signals via web search, filters by tech stack and hiring patterns, and generates per-persona outbound sequences with trigger-based emails.
-context: fork
-agent: general-purpose
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit, WebSearch, WebFetch

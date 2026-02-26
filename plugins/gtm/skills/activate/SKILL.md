@@ -1,8 +1,6 @@
 ---
 name: activate
 description: Generate landing pages, sales collateral, and marketing assets from positioning strategy. Creates deploy-ready HTML, email copy, and sales enablement docs. Reads codebase scan, market research, and positioning to produce a complete asset package.
-context: fork
-agent: asset-generator
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit
