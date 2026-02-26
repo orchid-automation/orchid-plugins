@@ -1,6 +1,6 @@
 ---
 name: position
-description: Synthesize codebase scan and market research into positioning strategy, battle cards, messaging pillars, pricing strategy, and objection map. Produces per-persona value propositions and per-competitor battle cards with trap questions and proof points.
+description: Build positioning strategy, battle cards, messaging pillars, and pricing from scan and market research.
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash

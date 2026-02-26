@@ -1,6 +1,6 @@
 ---
 name: scan
-description: Scan any codebase and map all technical capabilities into a structured inventory with counts, categories, and file references. Produces a GTM-ready feature inventory that downstream skills consume for market research, positioning, and asset generation.
+description: Scan a codebase and map all capabilities into a structured feature inventory with counts and file references.
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash

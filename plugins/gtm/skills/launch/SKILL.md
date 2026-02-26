@@ -1,6 +1,6 @@
 ---
 name: launch
-description: Run the full GTM pipeline for any codebase. Orchestrates scan, market research, positioning, asset generation, and outbound sequence creation in sequence. Validates each phase before proceeding to the next. Produces a complete go-to-market package at docs/gtm/.
+description: Run the full GTM pipeline — scan, market research, positioning, assets, and outbound — end to end.
 argument-hint: "[product-name]"
 user-invocable: true
 disable-model-invocation: true

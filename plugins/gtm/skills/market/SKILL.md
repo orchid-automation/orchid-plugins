@@ -1,6 +1,6 @@
 ---
 name: market
-description: Research ICP, competitors, and market sizing for a product based on its codebase scan. Determines who buys, who competes, and how big the opportunity is. Reads the scan output and produces a structured market intelligence document.
+description: Research ICP, competitors, and market sizing from a codebase scan. Determines who buys and who competes.
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
