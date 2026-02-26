@@ -2,7 +2,7 @@
 name: scan
 description: Scan a codebase and map all capabilities into a structured feature inventory with counts and file references.
 user-invocable: true
-disable-model-invocation: true
+argument-hint: "[product-name]"
 allowed-tools: Read, Glob, Grep, Bash
 ---
 

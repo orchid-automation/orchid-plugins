@@ -2,7 +2,7 @@
 name: market
 description: Research ICP, competitors, and market sizing from a codebase scan. Determines who buys and who competes.
 user-invocable: true
-disable-model-invocation: true
+argument-hint: "[product-name]"
 allowed-tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
 ---
 

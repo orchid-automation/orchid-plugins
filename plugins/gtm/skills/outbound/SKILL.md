@@ -2,7 +2,7 @@
 name: outbound
 description: Build ABM target lists and personalized cold email sequences from ICP and positioning strategy.
 user-invocable: true
-disable-model-invocation: true
+argument-hint: "[product-name]"
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit, WebSearch, WebFetch
 ---
 

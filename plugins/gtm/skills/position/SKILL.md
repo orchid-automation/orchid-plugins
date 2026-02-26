@@ -2,7 +2,7 @@
 name: position
 description: Build positioning strategy, battle cards, messaging pillars, and pricing from scan and market research.
 user-invocable: true
-disable-model-invocation: true
+argument-hint: "[product-name]"
 allowed-tools: Read, Glob, Grep, Bash
 ---
 

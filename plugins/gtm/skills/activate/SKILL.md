@@ -2,7 +2,7 @@
 name: activate
 description: Generate landing pages, cold email sequences, one-pagers, and sales collateral from positioning strategy.
 user-invocable: true
-disable-model-invocation: true
+argument-hint: "[product-name]"
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit
 ---
 
