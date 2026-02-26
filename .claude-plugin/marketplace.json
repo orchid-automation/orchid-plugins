@@ -28,6 +28,18 @@
       "homepage": "https://github.com/orchid-automation/orchid-plugins",
       "license": "MIT",
       "keywords": ["gtm", "feature-map", "product-marketing", "competitive-analysis", "sales-enablement", "positioning"]
+    },
+    {
+      "name": "gtm",
+      "source": "./plugins/gtm",
+      "description": "Go-to-market engine. Scan any codebase, determine ICP, research competitors, build positioning, generate landing pages, and create outbound sequences.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Orchid Automation"
+      },
+      "homepage": "https://github.com/orchid-automation/orchid-plugins",
+      "license": "MIT",
+      "keywords": ["gtm", "go-to-market", "icp", "competitive-analysis", "positioning", "landing-page", "outbound", "abm"]
     }
   ]
 }
