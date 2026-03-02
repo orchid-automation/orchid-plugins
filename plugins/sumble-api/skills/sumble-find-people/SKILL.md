@@ -16,33 +16,46 @@ Find people at a specific organization using the Sumble API.
 
 ## CRITICAL: Execution Rules
 
-1. **NO debugging in front of the user.** If a request fails, try ONE alternative silently. If it still fails, report the error cleanly.
-2. **Do NOT echo, print, or test the API key.** Assume it's set.
-3. **Do NOT show raw JSON responses.** Parse them and present clean formatted output only.
-4. **Make exactly ONE curl call.** Do not retry with different auth formats or headers.
-5. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+1. **NO debugging in front of the user.** Do not echo, print, or test the API key.
+2. **Do NOT show raw JSON responses.** Parse and present clean formatted output only.
+3. **Make exactly ONE API call.** Do not retry with different formats.
+4. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+5. **ALWAYS use python3 for API calls.** NEVER use curl — it has shell interpolation issues with the Bearer token.
 
 ## Your Task
 
 1. Parse the user's request to identify the target company and filter criteria
 2. Build the JSON request body
-3. Execute the curl command (using the EXACT format below)
-4. Parse the JSON response with `python3 -c` and present a clean markdown table
+3. Execute the python3 script below (using the EXACT pattern)
+4. Present the parsed output — never show raw JSON
 
-## Authentication — USE THIS EXACT FORMAT
+## IMPORTANT: Use python3, NOT curl
 
-```bash
-curl -s -X POST https://api.sumble.com/v3/people/find \
-  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{ ... }'
+Curl has shell interpolation issues with the Sumble API key. Always use python3 with urllib:
+
+```python
+python3 -c "
+import os, json, urllib.request
+key = os.environ.get('SUMBLE_API_KEY', '')
+if not key:
+    print('Error: SUMBLE_API_KEY not set. Run: export SUMBLE_API_KEY=\"your-key\"')
+    exit(1)
+payload = json.dumps({
+    'organization': {'domain': 'DOMAIN_HERE'},
+    'filters': {FILTERS_HERE},
+    'limit': 50
+}).encode()
+req = urllib.request.Request('https://api.sumble.com/v3/people/find', data=payload, headers={
+    'Authorization': f'Bearer {key}',
+    'Content-Type': 'application/json'
+})
+resp = json.loads(urllib.request.urlopen(req).read())
+# ... parse and print
+"
 ```
-
-**IMPORTANT**: Always use `${SUMBLE_API_KEY}` with curly braces. Do NOT test if the key is set — just use it.
 
 ## Endpoint Details
 
-**Method:** POST
 **URL:** `https://api.sumble.com/v3/people/find`
 **Cost:** 1 credit per person returned
 
@@ -50,7 +63,6 @@ curl -s -X POST https://api.sumble.com/v3/people/find \
 
 - `{"domain": "stripe.com"}` — Company domain
 - `{"id": 1726684}` — Sumble organization ID
-- `{"slug": "stripe"}` — Sumble organization slug
 - `{"linkedin_url": "https://www.linkedin.com/company/stripe"}` — LinkedIn company URL
 
 ### Filter Options
@@ -60,11 +72,7 @@ curl -s -X POST https://api.sumble.com/v3/people/find \
 - **countries**: Array of country codes (e.g., `["US", "CA", "GB"]`)
 - **technologies**: Array of technology names
 - **since**: ISO date (e.g., `"2023-01-01"`)
-
-### Pagination
-
 - **limit**: 1-250 (default: 10)
-- **offset**: 0-10000 (default: 0)
 
 ## Mapping User Intent to Filters
 
@@ -79,41 +87,57 @@ curl -s -X POST https://api.sumble.com/v3/people/find \
 | "product managers" | `["Product"]` | `["Manager", "Director"]` |
 | "C-suite" | — | `["C-Level"]` |
 
-## Example Execution (copy this pattern)
+## Complete Example (COPY THIS PATTERN EXACTLY)
 
 ```bash
-curl -s -X POST https://api.sumble.com/v3/people/find \
-  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "organization": {"domain": "stripe.com"},
-    "filters": {
-      "job_functions": ["Engineer"],
-      "job_levels": ["Manager", "Director"],
-      "countries": ["US"]
+python3 -c "
+import os, json, urllib.request
+
+key = os.environ.get('SUMBLE_API_KEY', '')
+if not key:
+    print('Error: SUMBLE_API_KEY not set. Run: export SUMBLE_API_KEY=\"your-key\"')
+    exit(1)
+
+payload = json.dumps({
+    'organization': {'domain': 'stripe.com'},
+    'filters': {
+        'job_functions': ['Engineer'],
+        'job_levels': ['Manager', 'Director'],
+        'countries': ['US']
     },
-    "limit": 50
-  }' | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-if 'detail' in data:
-    print(f'Error: {data[\"detail\"]}')
-    sys.exit(1)
+    'limit': 50
+}).encode()
+
+req = urllib.request.Request('https://api.sumble.com/v3/people/find', data=payload, headers={
+    'Authorization': f'Bearer {key}',
+    'Content-Type': 'application/json'
+})
+
+try:
+    data = json.loads(urllib.request.urlopen(req).read())
+except urllib.error.HTTPError as e:
+    err = json.loads(e.read())
+    print(f'Error: {err.get(\"detail\", str(e))}')
+    exit(1)
+
 print(f'Found {data.get(\"people_count\", 0)} people | Credits used: {data.get(\"credits_used\", 0)} | Remaining: {data.get(\"credits_remaining\", \"?\")}')
 print()
 for p in data.get('people', []):
-    print(f'- **{p[\"name\"]}** — {p.get(\"job_title\", \"N/A\")} ({p.get(\"job_level\", \"\")})')
-    print(f'  Location: {p.get(\"location\", \"N/A\")} | Started: {p.get(\"start_date\", \"N/A\")}')
-    if p.get('linkedin_url'):
-        print(f'  LinkedIn: {p[\"linkedin_url\"]}')
+    name = p.get('name', 'Unknown')
+    title = p.get('job_title', 'N/A')
+    level = p.get('job_level', '')
+    loc = p.get('location', 'N/A')
+    start = p.get('start_date', 'N/A')
+    li = p.get('linkedin_url', '')
+    print(f'- **{name}** — {title} ({level})')
+    print(f'  Location: {loc} | Started: {start}')
+    if li: print(f'  LinkedIn: {li}')
     print()
 "
 ```
 
 ## Output Instructions
 
-- Present results as a clean markdown list or table — NEVER show raw JSON
-- Include: name, title, level, location, start date, LinkedIn URL
-- Show total people found and credits used/remaining
+- Present the python3 output directly — it's already formatted as clean markdown
 - If 0 results: suggest broadening the search (remove function filter, or try different levels)
 - Suggest follow-up: `/sumble-enrich` or `/sumble-find-jobs`

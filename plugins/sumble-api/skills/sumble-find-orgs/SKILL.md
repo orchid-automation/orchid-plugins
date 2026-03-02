@@ -16,33 +16,21 @@ Search for companies matching the user's criteria using the Sumble API.
 
 ## CRITICAL: Execution Rules
 
-1. **NO debugging in front of the user.** If a request fails, try ONE alternative silently. If it still fails, report the error cleanly.
-2. **Do NOT echo, print, or test the API key.** Assume it's set.
-3. **Do NOT show raw JSON responses.** Parse them and present clean formatted output only.
-4. **Make exactly ONE curl call.** Do not retry with different auth formats or headers.
-5. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+1. **NO debugging in front of the user.** Do not echo, print, or test the API key.
+2. **Do NOT show raw JSON responses.** Parse and present clean formatted output only.
+3. **Make exactly ONE API call.** Do not retry with different formats.
+4. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+5. **ALWAYS use python3 for API calls.** NEVER use curl — it has shell interpolation issues with the Bearer token.
 
 ## Your Task
 
-1. Parse the user's request to identify filter criteria (technologies, industries, countries, employee count, etc.)
+1. Parse the user's request to identify filter criteria (technologies, industries, countries, etc.)
 2. Build the JSON request body
-3. Execute the curl command (using the EXACT format below)
-4. Parse the JSON response with `python3 -c` and present a clean markdown table
-
-## Authentication — USE THIS EXACT FORMAT
-
-```bash
-curl -s -X POST https://api.sumble.com/v3/organizations/find \
-  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{ ... }'
-```
-
-**IMPORTANT**: Always use `${SUMBLE_API_KEY}` with curly braces. Do NOT test if the key is set — just use it.
+3. Execute the python3 script below (using the EXACT pattern)
+4. Present the parsed output — never show raw JSON
 
 ## Endpoint Details
 
-**Method:** POST
 **URL:** `https://api.sumble.com/v3/organizations/find`
 **Cost:** 5 credits per organization, per filter term (minimum 5)
 
@@ -61,48 +49,60 @@ curl -s -X POST https://api.sumble.com/v3/organizations/find \
 - **order_by_column**: `industry`, `employee_count`, `first_activity_time`, `last_activity_time`, `jobs_count`, `teams_count`, `people_count`, `jobs_count_growth_6mo`, `cloud_spend_estimate_millions_usd`
 - **order_by_direction**: `ASC` or `DESC`
 
-### Pagination
+### Pagination: limit 1-200, offset 0-10000
 
-- **limit**: 1-200 (default: 10)
-- **offset**: 0-10000 (default: 0)
-
-## Example Execution (copy this pattern)
+## Complete Example (COPY THIS PATTERN EXACTLY)
 
 ```bash
-curl -s -X POST https://api.sumble.com/v3/organizations/find \
-  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "filters": {
-      "technologies": ["python", "react"],
-      "countries": ["US"]
+python3 -c "
+import os, json, urllib.request
+
+key = os.environ.get('SUMBLE_API_KEY', '')
+if not key:
+    print('Error: SUMBLE_API_KEY not set. Run: export SUMBLE_API_KEY=\"your-key\"')
+    exit(1)
+
+payload = json.dumps({
+    'filters': {
+        'technologies': ['python', 'react'],
+        'countries': ['US']
     },
-    "order_by_column": "employee_count",
-    "order_by_direction": "DESC",
-    "limit": 20
-  }' | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-if 'detail' in data:
-    print(f'Error: {data[\"detail\"]}')
-    sys.exit(1)
+    'order_by_column': 'employee_count',
+    'order_by_direction': 'DESC',
+    'limit': 20
+}).encode()
+
+req = urllib.request.Request('https://api.sumble.com/v3/organizations/find', data=payload, headers={
+    'Authorization': f'Bearer {key}',
+    'Content-Type': 'application/json'
+})
+
+try:
+    data = json.loads(urllib.request.urlopen(req).read())
+except urllib.error.HTTPError as e:
+    err = json.loads(e.read())
+    print(f'Error: {err.get(\"detail\", str(e))}')
+    exit(1)
+
 print(f'Found {data.get(\"total\", 0)} organizations | Credits used: {data.get(\"credits_used\", 0)} | Remaining: {data.get(\"credits_remaining\", \"?\")}')
 print()
 for org in data.get('organizations', []):
+    name = org.get('name', 'Unknown')
+    domain = org.get('domain', '')
+    industry = org.get('industry', 'N/A')
+    emp = org.get('total_employees', '?')
+    hq = f'{org.get(\"headquarters_country\", \"?\")}, {org.get(\"headquarters_state\", \"\")}'.strip(', ')
+    li = org.get('linkedin_organization_url', '')
     techs = ', '.join([e['term'] for e in org.get('matching_entities', []) if e.get('type') == 'technologies'])
-    print(f'- **{org[\"name\"]}** ({org.get(\"domain\", \"\")})')
-    print(f'  Industry: {org.get(\"industry\", \"N/A\")} | Employees: {org.get(\"total_employees\", \"?\")} | HQ: {org.get(\"headquarters_country\", \"?\")}, {org.get(\"headquarters_state\", \"\")}')
-    if techs:
-        print(f'  Matched technologies: {techs}')
-    if org.get('linkedin_organization_url'):
-        print(f'  LinkedIn: {org[\"linkedin_organization_url\"]}')
+    print(f'- **{name}** ({domain})')
+    print(f'  Industry: {industry} | Employees: {emp} | HQ: {hq}')
+    if techs: print(f'  Matched: {techs}')
+    if li: print(f'  LinkedIn: {li}')
     print()
 "
 ```
 
 ## Output Instructions
 
-- Present results as a clean markdown list or table — NEVER show raw JSON
-- Include: company name, domain, industry, employee count, location, matched technologies
-- Show total results and credits used/remaining
-- If the user wants to dig deeper, suggest `/sumble-enrich` with a specific domain
+- Present the python3 output directly — it's already formatted as clean markdown
+- To dig deeper into a specific company, suggest `/sumble-enrich`
