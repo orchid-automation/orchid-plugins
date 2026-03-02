@@ -1,6 +1,7 @@
 ---
 name: sumble-api
 description: Search companies by technology stack, enrich organization data, find people by role/seniority, and discover job postings with extracted technologies. Use for lead generation, CRM enrichment, market research, and competitor analysis. Requires API key with credit-based usage.
+user-invocable: false
 ---
 
 ## How to Use This Skill
