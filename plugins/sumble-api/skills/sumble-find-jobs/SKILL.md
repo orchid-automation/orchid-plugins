@@ -14,21 +14,31 @@ Search job postings using the Sumble API.
 
 ---
 
+## CRITICAL: Execution Rules
+
+1. **NO debugging in front of the user.** If a request fails, try ONE alternative silently. If it still fails, report the error cleanly.
+2. **Do NOT echo, print, or test the API key.** Assume it's set.
+3. **Do NOT show raw JSON responses.** Parse them and present clean formatted output only.
+4. **Make exactly ONE curl call.** Do not retry with different auth formats or headers.
+5. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+
 ## Your Task
 
 1. Parse the user's request to identify target company (if any) and filter criteria
-2. Build the appropriate JSON request body — set `organization` to `null` for broad searches
-3. Execute the curl command against `/v3/jobs/find`
-4. Present results showing job titles, technologies, and hiring patterns
+2. Build the JSON request body — set `organization` to `null` for broad searches
+3. Execute the curl command (using the EXACT format below)
+4. Parse the JSON response and present clean formatted output
 
-## Authentication
+## Authentication — USE THIS EXACT FORMAT
 
 ```bash
-# API key must be set as environment variable
-# Header: Authorization: Bearer $SUMBLE_API_KEY
+curl -s -X POST https://api.sumble.com/v3/jobs/find \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
 ```
 
-If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
+**IMPORTANT**: Always use `${SUMBLE_API_KEY}` with curly braces. Do NOT test if the key is set — just use it.
 
 ## Endpoint Details
 
@@ -40,86 +50,57 @@ If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
 
 - `{"domain": "stripe.com"}` — Company domain
 - `{"id": 1726684}` — Sumble organization ID
-- `{"slug": "stripe"}` — Sumble organization slug
-- `{"linkedin_url": "https://www.linkedin.com/company/stripe"}` — LinkedIn company URL
 - `null` — Search across ALL organizations
 
 ### Filter Options
 
 - **technologies**: Array of technology names (e.g., `["python", "react", "kubernetes"]`)
-- **technology_categories**: Array of category names (e.g., `["cloud-infrastructure", "databases", "artificial-intelligence"]`)
-- **job_functions**: Array of job function names (e.g., `["Engineer", "Data Scientist", "Machine Learning Engineer"]`)
+- **technology_categories**: Array of category names (e.g., `["cloud-infrastructure", "artificial-intelligence"]`)
+- **job_functions**: Array of job function names (e.g., `["Engineer", "Data Scientist"]`)
 - **countries**: Array of country codes (e.g., `["US", "CA"]`)
-- **since**: Date filter for when job was posted (ISO format: `"2024-01-01"`)
+- **since**: Date filter (ISO format: `"2024-01-01"`)
 
 ### Pagination
 
 - **limit**: 1-100 (default: 10)
 - **offset**: 0-10000 (default: 0)
 
-## Example Request — Single Company
+## Example Execution (copy this pattern)
 
 ```bash
-curl -X POST https://api.sumble.com/v3/jobs/find \
-  -H "Authorization: Bearer $SUMBLE_API_KEY" \
+curl -s -X POST https://api.sumble.com/v3/jobs/find \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "organization": {
-      "domain": "stripe.com"
-    },
+    "organization": {"domain": "stripe.com"},
     "filters": {
       "technologies": ["python", "react"],
       "job_functions": ["Engineer"],
       "since": "2024-01-01"
     },
     "limit": 25
-  }'
+  }' | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'detail' in data:
+    print(f'Error: {data[\"detail\"]}')
+    sys.exit(1)
+print(f'Found {data.get(\"total\", 0)} jobs | Credits used: {data.get(\"credits_used\", 0)} | Remaining: {data.get(\"credits_remaining\", \"?\")}')
+print()
+for j in data.get('jobs', []):
+    print(f'- **{j.get(\"job_title\", \"N/A\")}** at {j.get(\"organization_name\", \"\")} ({j.get(\"organization_domain\", \"\")})')
+    print(f'  Location: {j.get(\"location\", \"N/A\")} | Technologies: {j.get(\"matched_technologies\", \"N/A\")}')
+    print(f'  Posted: {j.get(\"datetime_pulled\", \"N/A\")[:10]}')
+    if j.get('url'):
+        print(f'  Details: {j[\"url\"]}')
+    print()
+"
 ```
-
-## Example Request — Broad Search (All Companies)
-
-```bash
-curl -X POST https://api.sumble.com/v3/jobs/find \
-  -H "Authorization: Bearer $SUMBLE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "organization": null,
-    "filters": {
-      "technology_categories": ["artificial-intelligence"],
-      "job_functions": ["Machine Learning Engineer"],
-      "countries": ["US"]
-    },
-    "limit": 50
-  }'
-```
-
-## Response Format
-
-Each job includes:
-- `job_title` — Job title from posting
-- `primary_job_function` — Standardized job function
-- `organization_name` / `organization_domain` — Company info
-- `matched_technologies` — Technologies from filters found in this posting
-- `location` — Job location
-- `teams` — Team names extracted from posting
-- `datetime_pulled` — When Sumble scraped this job
-- `description` — Job description text
-- `url` — Sumble job detail page URL
 
 ## Output Instructions
 
-Present results as:
-1. Job title and company
-2. Matched technologies
-3. Location
-4. Date posted
-5. Total results and credits used
-
-For trend analysis, summarize:
-- Most common technologies across postings
-- Geographic distribution
-- Team/function patterns
-
-Suggest follow-up actions:
-- `/sumble-enrich` to check the company's full tech stack
-- `/sumble-find-people` to find people at hiring companies
+- Present results as a clean markdown list — NEVER show raw JSON
+- Include: job title, company, location, matched technologies, date posted
+- Show total results and credits used/remaining
+- For trend analysis, summarize: most common technologies, geographic distribution
+- Suggest follow-up: `/sumble-enrich` or `/sumble-find-people`

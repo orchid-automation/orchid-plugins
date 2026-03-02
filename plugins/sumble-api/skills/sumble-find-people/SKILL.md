@@ -14,21 +14,31 @@ Find people at a specific organization using the Sumble API.
 
 ---
 
+## CRITICAL: Execution Rules
+
+1. **NO debugging in front of the user.** If a request fails, try ONE alternative silently. If it still fails, report the error cleanly.
+2. **Do NOT echo, print, or test the API key.** Assume it's set.
+3. **Do NOT show raw JSON responses.** Parse them and present clean formatted output only.
+4. **Make exactly ONE curl call.** Do not retry with different auth formats or headers.
+5. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+
 ## Your Task
 
-1. Parse the user's request to identify the target company and filter criteria (job functions, levels, countries, technologies)
-2. Build the appropriate JSON request body
-3. Execute the curl command against `/v3/people/find`
-4. Present results in a clean, readable format with LinkedIn links
+1. Parse the user's request to identify the target company and filter criteria
+2. Build the JSON request body
+3. Execute the curl command (using the EXACT format below)
+4. Parse the JSON response with `python3 -c` and present a clean markdown table
 
-## Authentication
+## Authentication — USE THIS EXACT FORMAT
 
 ```bash
-# API key must be set as environment variable
-# Header: Authorization: Bearer $SUMBLE_API_KEY
+curl -s -X POST https://api.sumble.com/v3/people/find \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
 ```
 
-If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
+**IMPORTANT**: Always use `${SUMBLE_API_KEY}` with curly braces. Do NOT test if the key is set — just use it.
 
 ## Endpoint Details
 
@@ -45,13 +55,11 @@ If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
 
 ### Filter Options
 
-- **job_functions**: Array of job function names
-  - Common values: `Engineer`, `Software Engineer`, `Frontend Engineer`, `Backend Engineer`, `Data Engineer`, `DevOps Engineer`, `Sales`, `Marketing`, `Operations`, `Product`, `Design`
-- **job_levels**: Array of seniority levels
-  - Values: `Individual Contributor`, `Manager`, `Senior Manager`, `Director`, `Senior Director`, `VP`, `Senior VP`, `C-Level`
+- **job_functions**: `Engineer`, `Software Engineer`, `Frontend Engineer`, `Backend Engineer`, `Data Engineer`, `DevOps Engineer`, `Sales`, `Marketing`, `Operations`, `Product`, `Design`
+- **job_levels**: `Individual Contributor`, `Manager`, `Senior Manager`, `Director`, `Senior Director`, `VP`, `Senior VP`, `C-Level`
 - **countries**: Array of country codes (e.g., `["US", "CA", "GB"]`)
-- **technologies**: Array of technology names (filters by people working with these technologies)
-- **since**: Date filter for when person started (ISO format: `"2023-01-01"`)
+- **technologies**: Array of technology names
+- **since**: ISO date (e.g., `"2023-01-01"`)
 
 ### Pagination
 
@@ -67,49 +75,45 @@ If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
 | "decision makers" | — | `["Director", "VP", "C-Level"]` |
 | "leadership" | — | `["VP", "Senior VP", "C-Level"]` |
 | "sales team" | `["Sales"]` | — |
+| "VPs of Sales" | `["Sales"]` | `["VP", "Senior VP"]` |
 | "product managers" | `["Product"]` | `["Manager", "Director"]` |
 | "C-suite" | — | `["C-Level"]` |
 
-## Example Request
+## Example Execution (copy this pattern)
 
 ```bash
-curl -X POST https://api.sumble.com/v3/people/find \
-  -H "Authorization: Bearer $SUMBLE_API_KEY" \
+curl -s -X POST https://api.sumble.com/v3/people/find \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "organization": {
-      "domain": "stripe.com"
-    },
+    "organization": {"domain": "stripe.com"},
     "filters": {
-      "job_functions": ["Engineer", "Operations"],
+      "job_functions": ["Engineer"],
       "job_levels": ["Manager", "Director"],
       "countries": ["US"]
     },
     "limit": 50
-  }'
+  }' | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'detail' in data:
+    print(f'Error: {data[\"detail\"]}')
+    sys.exit(1)
+print(f'Found {data.get(\"people_count\", 0)} people | Credits used: {data.get(\"credits_used\", 0)} | Remaining: {data.get(\"credits_remaining\", \"?\")}')
+print()
+for p in data.get('people', []):
+    print(f'- **{p[\"name\"]}** — {p.get(\"job_title\", \"N/A\")} ({p.get(\"job_level\", \"\")})')
+    print(f'  Location: {p.get(\"location\", \"N/A\")} | Started: {p.get(\"start_date\", \"N/A\")}')
+    if p.get('linkedin_url'):
+        print(f'  LinkedIn: {p[\"linkedin_url\"]}')
+    print()
+"
 ```
-
-## Response Format
-
-Each person includes:
-- `name` — Full name
-- `linkedin_url` — LinkedIn profile URL
-- `job_title` — Current job title
-- `job_function` — Standardized function
-- `job_level` — Seniority level
-- `location` — Full location string
-- `country_code` — ISO country code
-- `start_date` — When they started (YYYY-MM format)
 
 ## Output Instructions
 
-Present results as a clean table:
-1. Name (with LinkedIn link)
-2. Job title and level
-3. Location
-4. Start date
-5. Total people found and credits used
-
-Suggest follow-up actions:
-- `/sumble-enrich` to check what technologies this company uses
-- `/sumble-find-jobs` to see what they're hiring for
+- Present results as a clean markdown list or table — NEVER show raw JSON
+- Include: name, title, level, location, start date, LinkedIn URL
+- Show total people found and credits used/remaining
+- If 0 results: suggest broadening the search (remove function filter, or try different levels)
+- Suggest follow-up: `/sumble-enrich` or `/sumble-find-jobs`

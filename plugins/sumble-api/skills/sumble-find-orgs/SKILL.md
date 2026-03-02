@@ -14,21 +14,31 @@ Search for companies matching the user's criteria using the Sumble API.
 
 ---
 
+## CRITICAL: Execution Rules
+
+1. **NO debugging in front of the user.** If a request fails, try ONE alternative silently. If it still fails, report the error cleanly.
+2. **Do NOT echo, print, or test the API key.** Assume it's set.
+3. **Do NOT show raw JSON responses.** Parse them and present clean formatted output only.
+4. **Make exactly ONE curl call.** Do not retry with different auth formats or headers.
+5. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+
 ## Your Task
 
 1. Parse the user's request to identify filter criteria (technologies, industries, countries, employee count, etc.)
-2. Build the appropriate JSON request body
-3. Execute the curl command against `/v3/organizations/find`
-4. Present results in a clean, readable format
+2. Build the JSON request body
+3. Execute the curl command (using the EXACT format below)
+4. Parse the JSON response with `python3 -c` and present a clean markdown table
 
-## Authentication
+## Authentication — USE THIS EXACT FORMAT
 
 ```bash
-# API key must be set as environment variable
-# Header: Authorization: Bearer $SUMBLE_API_KEY
+curl -s -X POST https://api.sumble.com/v3/organizations/find \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
 ```
 
-If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
+**IMPORTANT**: Always use `${SUMBLE_API_KEY}` with curly braces. Do NOT test if the key is set — just use it.
 
 ## Endpoint Details
 
@@ -38,7 +48,6 @@ If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
 
 ### Filter Options
 
-The `filters` object supports:
 - **technologies**: Array of technology names (e.g., `["python", "react"]`)
 - **technology_categories**: Array of category names (e.g., `["cybersecurity", "databases"]`)
 - **industries**: Array of industry names
@@ -47,7 +56,7 @@ The `filters` object supports:
 - **employee_count**: Range filters (min/max)
 - **since**: Date filter (ISO format: `"2023-01-01"`)
 
-### Sorting Options
+### Sorting
 
 - **order_by_column**: `industry`, `employee_count`, `first_activity_time`, `last_activity_time`, `jobs_count`, `teams_count`, `people_count`, `jobs_count_growth_6mo`, `cloud_spend_estimate_millions_usd`
 - **order_by_direction**: `ASC` or `DESC`
@@ -57,11 +66,11 @@ The `filters` object supports:
 - **limit**: 1-200 (default: 10)
 - **offset**: 0-10000 (default: 0)
 
-## Example Request
+## Example Execution (copy this pattern)
 
 ```bash
-curl -X POST https://api.sumble.com/v3/organizations/find \
-  -H "Authorization: Bearer $SUMBLE_API_KEY" \
+curl -s -X POST https://api.sumble.com/v3/organizations/find \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "filters": {
@@ -71,25 +80,29 @@ curl -X POST https://api.sumble.com/v3/organizations/find \
     "order_by_column": "employee_count",
     "order_by_direction": "DESC",
     "limit": 20
-  }'
+  }' | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'detail' in data:
+    print(f'Error: {data[\"detail\"]}')
+    sys.exit(1)
+print(f'Found {data.get(\"total\", 0)} organizations | Credits used: {data.get(\"credits_used\", 0)} | Remaining: {data.get(\"credits_remaining\", \"?\")}')
+print()
+for org in data.get('organizations', []):
+    techs = ', '.join([e['term'] for e in org.get('matching_entities', []) if e.get('type') == 'technologies'])
+    print(f'- **{org[\"name\"]}** ({org.get(\"domain\", \"\")})')
+    print(f'  Industry: {org.get(\"industry\", \"N/A\")} | Employees: {org.get(\"total_employees\", \"?\")} | HQ: {org.get(\"headquarters_country\", \"?\")}, {org.get(\"headquarters_state\", \"\")}')
+    if techs:
+        print(f'  Matched technologies: {techs}')
+    if org.get('linkedin_organization_url'):
+        print(f'  LinkedIn: {org[\"linkedin_organization_url\"]}')
+    print()
+"
 ```
-
-## Response Format
-
-Each organization includes:
-- `name`, `domain`, `industry`
-- `total_employees`, `headquarters_country`, `headquarters_state`
-- `linkedin_organization_url`
-- `matching_people_count`, `matching_teams_count`, `matching_job_posts_count`
-- `matching_entities` — array of matched technologies with counts
 
 ## Output Instructions
 
-Present results as a clean table or list showing:
-1. Company name and domain
-2. Industry and employee count
-3. Location (country/state)
-4. Matched technologies and counts
-5. Total results and credits used
-
-If the user wants to dig deeper into a specific company, suggest using `/sumble-enrich` with that domain.
+- Present results as a clean markdown list or table — NEVER show raw JSON
+- Include: company name, domain, industry, employee count, location, matched technologies
+- Show total results and credits used/remaining
+- If the user wants to dig deeper, suggest `/sumble-enrich` with a specific domain

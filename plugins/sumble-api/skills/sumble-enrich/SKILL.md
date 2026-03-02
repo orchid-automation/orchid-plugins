@@ -14,21 +14,31 @@ Enrich a specific company with technology data using the Sumble API.
 
 ---
 
+## CRITICAL: Execution Rules
+
+1. **NO debugging in front of the user.** If a request fails, try ONE alternative silently. If it still fails, report the error cleanly.
+2. **Do NOT echo, print, or test the API key.** Assume it's set.
+3. **Do NOT show raw JSON responses.** Parse them and present clean formatted output only.
+4. **Make exactly ONE curl call.** Do not retry with different auth formats or headers.
+5. **Go straight to the API call.** Do not ask clarifying questions if you can infer from context.
+
 ## Your Task
 
 1. Parse the user's request to identify the company (domain, LinkedIn URL, or name) and any technology filters
-2. Build the appropriate JSON request body
-3. Execute the curl command against `/v3/organizations/enrich`
-4. Present results showing which technologies were found, with counts and details
+2. Build the JSON request body
+3. Execute the curl command (using the EXACT format below)
+4. Parse the JSON response and present clean formatted output
 
-## Authentication
+## Authentication — USE THIS EXACT FORMAT
 
 ```bash
-# API key must be set as environment variable
-# Header: Authorization: Bearer $SUMBLE_API_KEY
+curl -s -X POST https://api.sumble.com/v3/organizations/enrich \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
 ```
 
-If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
+**IMPORTANT**: Always use `${SUMBLE_API_KEY}` with curly braces. Do NOT test if the key is set — just use it.
 
 ## Endpoint Details
 
@@ -45,52 +55,44 @@ If `$SUMBLE_API_KEY` is not set, ask the user to provide it.
 
 ### Filter Options
 
-The `filters` object supports:
-- **technologies**: Array of specific technology names to check for (e.g., `["python", "react", "postgresql"]`)
+- **technologies**: Array of specific technology names (e.g., `["python", "react", "postgresql"]`)
 - **technology_categories**: Array of category names (e.g., `["cloud-infrastructure", "databases", "programming-languages"]`)
 - **since**: Date filter (ISO format: `"2023-01-01"`)
 
-**Tip:** If the user doesn't specify technologies, use broad technology_categories to get a comprehensive view: `["programming-languages", "databases", "cloud-infrastructure", "web-frameworks", "cybersecurity"]`
+**Default behavior**: If the user doesn't specify technologies, use broad categories:
+`["programming-languages", "databases", "cloud-infrastructure", "web-frameworks", "cybersecurity"]`
 
-## Example Request
+## Example Execution (copy this pattern)
 
 ```bash
-curl -X POST https://api.sumble.com/v3/organizations/enrich \
-  -H "Authorization: Bearer $SUMBLE_API_KEY" \
+curl -s -X POST https://api.sumble.com/v3/organizations/enrich \
+  -H "Authorization: Bearer ${SUMBLE_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "organization": {
-      "domain": "stripe.com"
-    },
+    "organization": {"domain": "stripe.com"},
     "filters": {
       "technologies": ["python", "react", "postgresql"],
-      "technology_categories": ["cloud-infrastructure"],
-      "since": "2023-01-01"
+      "technology_categories": ["cloud-infrastructure"]
     }
-  }'
+  }' | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'detail' in data:
+    print(f'Error: {data[\"detail\"]}')
+    sys.exit(1)
+org = data.get('organization', {})
+print(f'# {org.get(\"name\", \"Unknown\")} ({org.get(\"domain\", \"\")})')
+print(f'Technologies found: {data.get(\"technologies_count\", 0)} | Credits used: {data.get(\"credits_used\", 0)} | Remaining: {data.get(\"credits_remaining\", \"?\")}')
+print()
+for t in data.get('technologies', []):
+    print(f'- **{t[\"name\"]}** — Jobs: {t.get(\"jobs_count\", 0)} | People: {t.get(\"people_count\", 0)} | Teams: {t.get(\"teams_count\", 0)} | Last post: {t.get(\"last_job_post\", \"N/A\")}')
+print()
+"
 ```
-
-## Response Format
-
-Returns:
-- `organization` — matched company details (id, slug, name, domain)
-- `technologies_found` — comma-separated list of matched technologies
-- `technologies_count` — number of technologies found
-- `technologies` — array with per-technology details:
-  - `name` — technology name
-  - `last_job_post` — date of most recent job posting mentioning it
-  - `jobs_count` — number of job postings
-  - `people_count` — number of people with this skill
-  - `teams_count` — number of teams using it
 
 ## Output Instructions
 
-Present results as:
-1. Company name and domain
-2. Technologies found (with counts for jobs, people, teams)
-3. Most recent activity dates
-4. Credits used
-
-Suggest follow-up actions:
-- `/sumble-find-people` to find people at this company
-- `/sumble-find-jobs` to see their job postings
+- Present results as a clean markdown list — NEVER show raw JSON
+- Include: technology name, job count, people count, team count, last activity
+- Show total technologies found and credits used/remaining
+- Suggest follow-up: `/sumble-find-people` or `/sumble-find-jobs`
