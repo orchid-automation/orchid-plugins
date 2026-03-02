@@ -4,28 +4,32 @@ description: Discover people at specific companies by role, seniority, location,
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[domain and criteria, e.g. 'stripe.com engineers managers US']"
-allowed-tools: Bash, Read
+allowed-tools: Bash(python3 *), Read
 ---
 
 # Find People with Sumble
 
 **User's request:** $ARGUMENTS
 
+## Script path
+
+!`find ~/.claude/plugins -path "*/sumble-api/scripts/sumble_api.py" 2>/dev/null | head -1`
+
 ## Execution
 
-1. Parse request for company domain, job functions, levels, countries
-2. Map user intent to filters (see table below)
-3. Run the shared helper — **ONE call, no retries, no debugging**:
+Run **one** command. Do not use curl. Do not test the API key.
 
 ```bash
-python3 "PLUGIN_DIR/scripts/sumble_api.py" "people/find" '{"organization": {"domain": "stripe.com"}, "filters": {"job_functions": ["Engineer"], "job_levels": ["Manager", "Director"]}, "limit": 50}'
+python3 "<script path from above>" "people/find" '{
+  "organization": {"domain": "DOMAIN"},
+  "filters": {FILTERS},
+  "limit": 50
+}'
 ```
 
-Replace `PLUGIN_DIR` with the absolute path to the `sumble-api` plugin directory.
+The script handles auth, retries, errors, domain normalization, and output formatting.
 
-**CRITICAL**: Do NOT use curl. Do NOT echo/test the API key. Do NOT show raw JSON. The helper handles auth, retries, errors, and formatting automatically.
-
-## Intent → Filters Mapping
+## Intent → Filters
 
 | User says | job_functions | job_levels |
 |-----------|--------------|------------|
@@ -40,16 +44,16 @@ Replace `PLUGIN_DIR` with the absolute path to the `sumble-api` plugin directory
 | "marketing" | `["Marketing"]` | — |
 | "DevOps" | `["DevOps Engineer"]` | — |
 
-## Filters Reference
+## Available filters
 
-| Filter | Type | Example |
-|--------|------|---------|
-| job_functions | string[] | `["Engineer", "Sales"]` |
-| job_levels | string[] | `["Manager", "Director", "VP", "C-Level"]` |
-| countries | string[] | `["US", "CA", "GB"]` |
-| technologies | string[] | `["python", "react"]` |
-| since | string | `"2023-01-01"` |
+- **job_functions**: `Engineer`, `Software Engineer`, `Frontend Engineer`, `Backend Engineer`, `Data Engineer`, `DevOps Engineer`, `Sales`, `Marketing`, `Operations`, `Product`, `Design`
+- **job_levels**: `Individual Contributor`, `Manager`, `Senior Manager`, `Director`, `Senior Director`, `VP`, `Senior VP`, `C-Level`
+- **countries**: ISO codes like `["US", "CA", "GB"]`
+- **technologies**: `["python", "react"]`
+- **since**: `"2023-01-01"`
+- **limit**: 1-250
 
 **Organization ID**: domain (preferred), id, slug, or linkedin_url
-**Pagination**: `limit` (1-250), `offset` (0-10000)
-**Cost**: 1 credit per person returned
+**Cost**: 1 credit per person
+
+For API details, see [common.md](references/common.md). For troubleshooting, see [troubleshooting.md](../sumble-api/references/troubleshooting.md).

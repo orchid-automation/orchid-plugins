@@ -4,28 +4,36 @@ description: Enrich a company profile with its technology stack — programming 
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[domain, e.g. 'stripe.com' or 'stripe.com python react']"
-allowed-tools: Bash, Read
+allowed-tools: Bash(python3 *), Read
 ---
 
 # Enrich Organization with Sumble
 
 **User's request:** $ARGUMENTS
 
+## Script path
+
+!`find ~/.claude/plugins -path "*/sumble-api/scripts/sumble_api.py" 2>/dev/null | head -1`
+
 ## Execution
 
-1. Extract domain from request (the helper normalizes "stripe", "stripe.com", "https://www.stripe.com" automatically)
-2. If user specifies technologies, use those as filters. Otherwise use broad categories.
-3. Run the shared helper — **ONE call, no retries, no debugging**:
+Run **one** command. Do not use curl. Do not test the API key.
 
 ```bash
-python3 "PLUGIN_DIR/scripts/sumble_api.py" "organizations/enrich" '{"organization": {"domain": "stripe.com"}, "filters": {"technology_categories": ["programming-languages", "databases", "cloud-infrastructure", "web-frameworks"]}}'
+python3 "<script path from above>" "organizations/enrich" '{
+  "organization": {"domain": "stripe.com"},
+  "filters": {"technology_categories": ["programming-languages", "databases", "cloud-infrastructure", "web-frameworks"]}
+}'
 ```
 
-Replace `PLUGIN_DIR` with the absolute path to the `sumble-api` plugin directory.
+The script handles auth, retries, errors, domain normalization, and output formatting.
 
-**CRITICAL**: Do NOT use curl. Do NOT echo/test the API key. Do NOT show raw JSON. The helper handles auth, retries, errors, and formatting automatically.
+## Default behavior
 
-## Filters Reference
+If user doesn't specify technologies, use broad categories:
+`["programming-languages", "databases", "cloud-infrastructure", "web-frameworks", "cybersecurity"]`
+
+## Available filters
 
 | Filter | Type | Example |
 |--------|------|---------|
@@ -35,4 +43,5 @@ Replace `PLUGIN_DIR` with the absolute path to the `sumble-api` plugin directory
 
 **Organization ID**: domain (preferred), id, slug, or linkedin_url
 **Cost**: 5 credits per technology found
-**Default categories** (when user doesn't specify): `programming-languages`, `databases`, `cloud-infrastructure`, `web-frameworks`, `cybersecurity`
+
+For API details, see [common.md](references/common.md). For troubleshooting, see [troubleshooting.md](../sumble-api/references/troubleshooting.md).

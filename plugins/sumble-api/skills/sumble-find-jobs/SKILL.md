@@ -4,33 +4,42 @@ description: Search job postings by company, technologies, job functions, and lo
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[domain or criteria, e.g. 'stripe.com python' or 'AI engineers US']"
-allowed-tools: Bash, Read
+allowed-tools: Bash(python3 *), Read
 ---
 
 # Find Jobs with Sumble
 
 **User's request:** $ARGUMENTS
 
+## Script path
+
+!`find ~/.claude/plugins -path "*/sumble-api/scripts/sumble_api.py" 2>/dev/null | head -1`
+
 ## Execution
 
-1. Parse request for company domain (optional), technologies, job functions, countries
-2. If no company specified, set organization to `null` for broad search
-3. Run the shared helper — **ONE call, no retries, no debugging**:
+Run **one** command. Do not use curl. Do not test the API key.
 
+**Single company:**
 ```bash
-python3 "PLUGIN_DIR/scripts/sumble_api.py" "jobs/find" '{"organization": {"domain": "stripe.com"}, "filters": {"technologies": ["python"], "job_functions": ["Engineer"]}, "limit": 25}'
+python3 "<script path from above>" "jobs/find" '{
+  "organization": {"domain": "stripe.com"},
+  "filters": {"technologies": ["python"], "job_functions": ["Engineer"]},
+  "limit": 25
+}'
 ```
 
-For broad search (no specific company):
+**Broad search (no specific company):**
 ```bash
-python3 "PLUGIN_DIR/scripts/sumble_api.py" "jobs/find" '{"organization": null, "filters": {"technology_categories": ["artificial-intelligence"], "countries": ["US"]}, "limit": 25}'
+python3 "<script path from above>" "jobs/find" '{
+  "organization": null,
+  "filters": {"technology_categories": ["artificial-intelligence"], "countries": ["US"]},
+  "limit": 25
+}'
 ```
 
-Replace `PLUGIN_DIR` with the absolute path to the `sumble-api` plugin directory.
+The script handles auth, retries, errors, domain normalization, and output formatting.
 
-**CRITICAL**: Do NOT use curl. Do NOT echo/test the API key. Do NOT show raw JSON. The helper handles auth, retries, errors, and formatting automatically.
-
-## Filters Reference
+## Available filters
 
 | Filter | Type | Example |
 |--------|------|---------|
@@ -42,4 +51,6 @@ Replace `PLUGIN_DIR` with the absolute path to the `sumble-api` plugin directory
 
 **Organization**: domain, id, slug, linkedin_url, or `null` (all companies)
 **Pagination**: `limit` (1-100), `offset` (0-10000)
-**Cost**: 3 credits per job returned
+**Cost**: 3 credits per job
+
+For API details, see [common.md](references/common.md). For troubleshooting, see [troubleshooting.md](../sumble-api/references/troubleshooting.md).
