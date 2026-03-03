@@ -33,7 +33,7 @@ Provide ONE of the following (or null to search all organizations):
 
 The `filters` object supports:
 - **technologies**: Array of technology names (e.g., ["python", "react", "kubernetes"])
-- **technology_categories**: Array of category names (e.g., ["cloud-infrastructure", "databases"])
+- **technology_categories**: Array of category names (e.g., ["cybersecurity", "ci-cd", "mlops"]). See organizations.md for the full list of valid category slugs.
 - **job_functions**: Array of job function names (e.g., ["Engineer", "Data Scientist"])
 - **countries**: Array of country codes (e.g., ["US", "CA"])
 - **since**: Date filter for when job was posted (ISO format: "2023-01-01")
@@ -66,7 +66,7 @@ curl -X POST https://api.sumble.com/v3/jobs/find \
   -d '{
     "organization": null,
     "filters": {
-      "technology_categories": ["artificial-intelligence"],
+      "technology_categories": ["mlops"],
       "job_functions": ["Machine Learning Engineer"],
       "countries": ["US"]
     },

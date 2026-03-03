@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
 Shared Sumble API helper for all slash commands.
-Usage: python3 scripts/sumble_api.py <endpoint> '<json_payload>'
+
+Usage:
+  python3 sumble_api.py <endpoint> '<json_payload>'
+  python3 sumble_api.py <endpoint> '<json_payload>' --save
+  python3 sumble_api.py --check-auth
 
 Endpoints: organizations/find, organizations/enrich, people/find, jobs/find
+
+Flags:
+  --save        Write results to .sumble/ directory (keeps context window clean)
+  --check-auth  Validate API key is set (no API call, exit 0 or 1)
 """
 
 import json
@@ -14,6 +22,7 @@ import urllib.error
 import urllib.request
 
 BASE_URL = "https://api.sumble.com/v3"
+OUTPUT_DIR = ".sumble"
 
 # ── Auth ──────────────────────────────────────────────────────────────
 
@@ -25,6 +34,16 @@ def get_api_key():
         print("Get a key at: https://sumble.com/account/api-keys")
         sys.exit(1)
     return key
+
+def check_auth():
+    """Validate API key exists. Returns exit code 0 (ok) or 1 (missing)."""
+    key = os.environ.get("SUMBLE_API_KEY", "").strip()
+    if key:
+        print(f"SUMBLE_API_KEY is set ({len(key)} chars)")
+        sys.exit(0)
+    else:
+        print("SUMBLE_API_KEY is not set")
+        sys.exit(1)
 
 # ── Domain normalization ──────────────────────────────────────────────
 
@@ -174,15 +193,52 @@ FORMATTERS = {
     "jobs/find": print_jobs,
 }
 
+# ── File output ──────────────────────────────────────────────────────
+
+def save_output(endpoint, data, formatted_output):
+    """Save results to .sumble/ directory. Returns the file path."""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    slug = endpoint.replace("/", "_")
+    # Include domain if present for easy identification
+    org = data.get("organization", {})
+    if isinstance(org, dict) and org.get("domain"):
+        slug = f"{org['domain']}_{slug}"
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    filename = f"{slug}_{ts}.md"
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    with open(filepath, "w") as f:
+        f.write(formatted_output)
+    # Also save raw JSON for programmatic use
+    json_path = os.path.join(OUTPUT_DIR, filename.replace(".md", ".json"))
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=2)
+    return filepath
+
+def capture_output(formatter, data):
+    """Run a formatter and capture its printed output."""
+    import io
+    old_stdout = sys.stdout
+    sys.stdout = buffer = io.StringIO()
+    formatter(data)
+    sys.stdout = old_stdout
+    return buffer.getvalue()
+
 # ── CLI entry point ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Handle --check-auth flag
+    if "--check-auth" in sys.argv:
+        check_auth()
+
     if len(sys.argv) < 3:
-        print("Usage: python3 sumble_api.py <endpoint> '<json_payload>'")
+        print("Usage: python3 sumble_api.py <endpoint> '<json_payload>' [--save]")
+        print("       python3 sumble_api.py --check-auth")
         print("Endpoints: organizations/find, organizations/enrich, people/find, jobs/find")
         sys.exit(1)
 
     endpoint = sys.argv[1]
+    save_to_file = "--save" in sys.argv
+
     try:
         payload = json.loads(sys.argv[2])
     except json.JSONDecodeError as e:
@@ -196,7 +252,19 @@ if __name__ == "__main__":
 
     data = call_api(endpoint, payload)
     formatter = FORMATTERS.get(endpoint)
+
     if formatter:
-        formatter(data)
+        if save_to_file:
+            output = capture_output(formatter, data)
+            filepath = save_output(endpoint, data, output)
+            # Print summary to stdout, full results in file
+            total = data.get("total", data.get("people_count", data.get("technologies_count", "?")))
+            credits = data.get("credits_used", 0)
+            remaining = data.get("credits_remaining", "?")
+            print(f"Found {total} results | Credits used: {credits} | Remaining: {remaining}")
+            print(f"Full results saved to: {filepath}")
+            print(f"Raw JSON saved to: {filepath.replace('.md', '.json')}")
+        else:
+            formatter(data)
     else:
         print(json.dumps(data, indent=2))

@@ -26,7 +26,7 @@ Search for companies matching specific criteria including technology stack, indu
 
 The `filters` object supports:
 - **technologies**: Array of technology names (e.g., ["python", "react"])
-- **technology_categories**: Array of category names (e.g., ["cybersecurity", "databases"])
+- **technology_categories**: Array of category names (e.g., ["cybersecurity", "ci-cd", "crm"]). Valid values include: `cybersecurity`, `cloud-security`, `edr`, `siem`, `sast`, `dast`, `ci-cd`, `mlops`, `etl`, `olap`, `data-lake`, `vector-database`, `event-streaming`, `business-intelligence`, `crm`, `hris`, `payroll`, `ccaas`, `payment-processing`, `design`, `headless-cms`, `javascript`, `content-delivery-network`, `ipaas`. WARNING: categories expand to all technologies within them and can be expensive.
 - **industries**: Array of industry names
 - **job_functions**: Array of job function names
 - **countries**: Array of country codes (e.g., ["US", "CA"])
@@ -125,7 +125,7 @@ curl -X POST https://api.sumble.com/v3/organizations/enrich \
     },
     "filters": {
       "technologies": ["python", "react", "postgresql"],
-      "technology_categories": ["cloud-infrastructure"],
+      "technology_categories": ["cybersecurity"],
       "since": "2023-01-01"
     }
   }'

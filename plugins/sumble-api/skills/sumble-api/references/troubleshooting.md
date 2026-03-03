@@ -55,6 +55,18 @@ If you see this error, the skill is using an outdated version. Update:
 /plugin install sumble-api@orchid-plugins
 ```
 
+## "Unknown technology category(ies)" (HTTP 422)
+
+The `technology_categories` filter uses specific slugs, not generic names.
+
+**Invalid**: `"programming-languages"`, `"databases"`, `"cloud-infrastructure"`, `"web-frameworks"`
+
+**Valid examples**: `"cybersecurity"`, `"ci-cd"`, `"crm"`, `"etl"`, `"mlops"`, `"siem"`, `"vector-database"`, `"business-intelligence"`, `"javascript"`, `"design"`
+
+**Fix:** Use individual `technologies` instead (e.g., `["python", "react", "postgresql"]`). These are more predictable in both results and credit cost (5 credits each). Only use `technology_categories` when you need a specific known category like `"cybersecurity"`.
+
+See the full list of valid categories in [organizations.md](organizations.md).
+
 ## Domain not recognized
 
 If a domain returns errors, try:

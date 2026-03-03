@@ -1,7 +1,7 @@
 {
   "name": "sumble-api",
-  "description": "Sales intelligence API skill for searching companies by tech stack, enriching organizations, finding people by role/seniority, and discovering job postings. Powers lead generation, CRM enrichment, and competitive analysis.",
-  "version": "1.0.0",
+  "description": "Sales intelligence API — search companies by tech stack, enrich orgs, find people by role, discover job postings, and run full company research briefs. 5 slash commands: /sumble-find-orgs, /sumble-enrich, /sumble-find-people, /sumble-find-jobs, /sumble-research.",
+  "version": "1.1.0",
   "author": { "name": "Orchid Automation" },
   "homepage": "https://github.com/orchid-automation/orchid-plugins",
   "repository": "https://github.com/orchid-automation/orchid-plugins",

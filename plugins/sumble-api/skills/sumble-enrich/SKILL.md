@@ -15,31 +15,38 @@ allowed-tools: Bash(python3 *), Read
 
 !`find ~/.claude/plugins -path "*/sumble-api/scripts/sumble_api.py" 2>/dev/null | head -1`
 
-## Execution
+## Execution rules
 
-Run **one** command. Do not use curl. Do not test the API key.
+- Run exactly **one** python3 command. No curl. No API key testing. No retries.
+- For large queries, add `--save` to write results to `.sumble/` and keep context clean.
+- The script handles auth, retries, errors, domain normalization, and output formatting.
+- Present the formatted output directly to the user. Do not reformat or wrap in code blocks.
 
 ```bash
 python3 "<script path from above>" "organizations/enrich" '{
   "organization": {"domain": "stripe.com"},
-  "filters": {"technology_categories": ["programming-languages", "databases", "cloud-infrastructure", "web-frameworks"]}
+  "filters": {"technologies": ["python", "react", "typescript", "java", "go", "ruby", "postgresql", "mysql", "redis", "mongodb", "elasticsearch", "kafka", "aws", "gcp", "azure", "docker", "kubernetes", "terraform"]}
 }'
 ```
 
-The script handles auth, retries, errors, domain normalization, and output formatting.
-
 ## Default behavior
 
-If user doesn't specify technologies, use broad categories:
-`["programming-languages", "databases", "cloud-infrastructure", "web-frameworks", "cybersecurity"]`
+If user doesn't specify technologies, use a broad set of individual technology slugs:
+`["python", "react", "typescript", "java", "go", "ruby", "postgresql", "mysql", "redis", "mongodb", "elasticsearch", "kafka", "aws", "gcp", "azure", "docker", "kubernetes", "terraform"]`
+
+Prefer `technologies` over `technology_categories` — individual slugs are predictable (5 credits each) and won't surprise with hidden expansions.
 
 ## Available filters
 
 | Filter | Type | Example |
 |--------|------|---------|
-| technologies | string[] | `["python", "react", "postgresql"]` |
-| technology_categories | string[] | `["programming-languages", "databases"]` |
+| technologies | string[] (preferred) | `["python", "react", "postgresql"]` |
+| technology_categories | string[] | `["cybersecurity", "ci-cd", "crm", "etl"]` |
 | since | string | `"2023-01-01"` |
+
+**Valid technology_categories** (partial list): `cybersecurity`, `cloud-security`, `edr`, `siem`, `sast`, `dast`, `ci-cd`, `mlops`, `etl`, `olap`, `data-lake`, `vector-database`, `event-streaming`, `business-intelligence`, `crm`, `hris`, `payroll`, `ccaas`, `payment-processing`, `design`, `headless-cms`, `javascript`, `content-delivery-network`, `ipaas`
+
+**WARNING**: Categories expand to ALL technologies within them. A single category can contain 50+ technologies at 5 credits each. Use individual `technologies` for predictable costs.
 
 **Organization ID**: domain (preferred), id, slug, or linkedin_url
 **Cost**: 5 credits per technology found

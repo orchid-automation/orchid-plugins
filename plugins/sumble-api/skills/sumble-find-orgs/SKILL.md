@@ -15,9 +15,12 @@ allowed-tools: Bash(python3 *), Read
 
 !`find ~/.claude/plugins -path "*/sumble-api/scripts/sumble_api.py" 2>/dev/null | head -1`
 
-## Execution
+## Execution rules
 
-Run **one** command. Do not use curl. Do not test the API key.
+- Run exactly **one** python3 command. No curl. No API key testing. No retries.
+- For large queries (limit > 25), add `--save` to write results to `.sumble/` and keep context clean.
+- The script handles auth, retries, errors, domain normalization, and output formatting.
+- Present the formatted output directly to the user. Do not reformat or wrap in code blocks.
 
 ```bash
 python3 "<script path from above>" "organizations/find" '{
@@ -28,14 +31,12 @@ python3 "<script path from above>" "organizations/find" '{
 }'
 ```
 
-The script handles auth, retries, errors, and output formatting.
-
 ## Available filters
 
 | Filter | Type | Example |
 |--------|------|---------|
 | technologies | string[] | `["python", "react"]` |
-| technology_categories | string[] | `["cybersecurity", "databases"]` |
+| technology_categories | string[] | `["cybersecurity", "ci-cd", "crm", "etl"]` |
 | industries | string[] | `["Information", "Finance"]` |
 | countries | string[] | `["US", "CA"]` |
 | employee_count | object | `{"min": 50, "max": 500}` |

@@ -70,7 +70,7 @@ curl -X POST https://api.sumble.com/v3/organizations/enrich \
       "domain": "stripe.com"
     },
     "filters": {
-      "technology_categories": ["programming-languages", "databases"]
+      "technologies": ["python", "react", "postgresql", "aws", "docker"]
     }
   }'
 ```
