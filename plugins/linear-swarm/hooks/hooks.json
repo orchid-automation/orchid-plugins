@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/preflight.sh\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/linear_swarm_gate.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/linear_swarm_gate.sh\""
           }
         ]
       }

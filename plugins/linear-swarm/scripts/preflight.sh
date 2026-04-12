@@ -5,6 +5,11 @@
 
 set -u
 
+# Claude Code hooks don't inherit shell profiles — source them as fallback
+for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
+  [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
+done
+
 warn() { printf '  ⚠ %s\n' "$1"; }
 ok()   { printf '  ✓ %s\n' "$1"; }
 

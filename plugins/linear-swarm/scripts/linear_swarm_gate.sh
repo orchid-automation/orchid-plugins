@@ -5,6 +5,11 @@
 
 set -u
 
+# Claude Code hooks don't inherit shell profiles — source them as fallback
+for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
+  [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
+done
+
 # Only gate /linear-swarm prompts — let everything else through
 input=$(cat)
 prompt=$(printf '%s' "$input" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); print(d.get("prompt",""))' 2>/dev/null || true)

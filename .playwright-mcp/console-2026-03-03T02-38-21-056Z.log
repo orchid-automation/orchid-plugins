@@ -1,0 +1,2 @@
+[    2498ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://o4505073025220608.ingest.sentry.io/api/4505073026334720/envelope/?sentry_version=7&sentry_key=67711a6eef5b455e9d5dbaf8942844b1&sentry_client=sentry.javascript.react%2F10.41.0:0
+[   20037ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://sumble.com/api/technology-categories:0
