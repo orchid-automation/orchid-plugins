@@ -48,12 +48,10 @@ def dtx_py(sandbox: str, python_code: str) -> subprocess.CompletedProcess:
     parens survive zsh's re-tokenization on the Mac side.
     """
     b64 = base64.b64encode(python_code.encode()).decode()
-    # Use bash -c on the local side to control quoting explicitly
-    shell_cmd = (
-        f"daytona exec {sandbox} -- python3 -c "
-        f"'exec\\(__import__\\(\"base64\"\\).b64decode\\(\"{b64}\"\\).decode\\(\\)\\)'"
-    )
-    return run(["bash", "-c", shell_cmd])
+    # Write script to sandbox via echo+base64, then exec it (avoids all shell quoting)
+    write_cmd = f"echo {b64} | base64 -d > /tmp/_swarm_run.py"
+    run(["daytona", "exec", sandbox, "--", "bash", "-c", write_cmd], check=False)
+    return run(["daytona", "exec", sandbox, "--", "python3", "/tmp/_swarm_run.py"])
 
 
 def main() -> int:
