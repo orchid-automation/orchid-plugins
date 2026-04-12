@@ -48,13 +48,19 @@ def dtx_py(sandbox: str, python_code: str) -> subprocess.CompletedProcess:
     parens survive zsh's re-tokenization on the Mac side.
     """
     b64 = base64.b64encode(python_code.encode()).decode()
-    # Use shell=True so the user's login shell (zsh) handles escaping correctly.
-    # This is the exact pattern proven in the PLAYKIT-35 experiment.
-    cmd = (
-        f"daytona exec {sandbox} -- python3 -c "
-        f"'exec\\(__import__\\(\"base64\"\\).b64decode\\(\"{b64}\"\\).decode\\(\\)\\)'"
-    )
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    # Write base64 to sandbox in chunks (base64 chars are shell-safe in single quotes),
+    # then decode to .py file and execute. Avoids ALL shell-quoting issues across
+    # the 3-layer chain (local shell → daytona transport → sandbox shell).
+    chunk_size = 4000
+    for i in range(0, len(b64), chunk_size):
+        chunk = b64[i:i + chunk_size]
+        op = ">" if i == 0 else ">>"
+        run(["daytona", "exec", sandbox, "--", "bash", "-c",
+             f"printf '%s' '{chunk}' {op} /tmp/_b64.txt"], check=False)
+    # Decode base64 → python file, then execute
+    result = run(["daytona", "exec", sandbox, "--", "bash", "-c",
+                  "base64 -d /tmp/_b64.txt > /tmp/_swarm_run.py && python3 /tmp/_swarm_run.py"],
+                 check=False)
     if result.returncode != 0:
         sys.stderr.write(f"Worker failed (rc={result.returncode}):\n{result.stderr[-500:]}\n")
     if result.stdout:
