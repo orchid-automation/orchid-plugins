@@ -51,20 +51,20 @@ The user sees YOUR TEXT OUTPUT as the primary experience. This must feel like wa
 ### What the user SHOULD see
 
 ```
-Phase 0 — Scoping PLAYKIT "Infrastructure and observability"
-  ✓ Found 3 parent tasks (PLAYKIT-22, PLAYKIT-7, PLAYKIT-35)
-  ⚠ PLAYKIT-7 scored WEAK — prerequisites unchecked
-  ✓ Merge order: PLAYKIT-7 → PLAYKIT-22
+Phase 0 — Scoping ACME "Q2 Platform Work"
+  ✓ Found 4 parent tasks (ACME-101, ACME-102, ACME-103, ACME-104)
+  ⚠ ACME-104 scored WEAK — prerequisites unchecked
+  ✓ Merge order: ACME-102 → ACME-103 → ACME-101
 
 Phase 0.5 — Writing test specifications
-  ✓ PLAYKIT-22: 6 structural checks + 5 import smokes
+  ✓ ACME-101: 6 structural checks + 3 import smokes
 
-Phase 1 — Spinning up 2 workers (Daytona sandbox, GLM 5.1)
-  ● PLAYKIT-22 working...
-  ✓ PLAYKIT-22 committed — pipeline/kb.py created, all checks pass
+Phase 1 — Spinning up 3 workers (Daytona sandbox, GLM 5.1)
+  ● ACME-101 working...
+  ✓ ACME-101 committed — 2 files changed, all checks pass
 
 Phase 2 — Reviewing (compound-engineering fleet + Codex)
-  ✓ PLAYKIT-22: READY
+  ✓ ACME-101: READY
 
 --dry-run: stopping before push.
 ```
@@ -88,7 +88,7 @@ Phase 2 — Reviewing (compound-engineering fleet + Codex)
    TaskUpdate(taskId, status="completed")
    ```
 
-5. **Agent descriptions must be human-readable:** `"PLAYKIT-22 knowledge refresh"` not `"Run task in worktree for issue"`.
+5. **Agent descriptions must be human-readable:** `"ACME-101 auth migration"` not `"Run task in worktree for issue"`.
 
 6. **Suppress intermediate output.** When calling scripts, pipe output to a temp file and only surface the summary line. Example: `python3 script.py > /tmp/log.txt 2>&1 && tail -1 /tmp/log.txt`
 

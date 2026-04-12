@@ -52,8 +52,8 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 
 Examples:
 ```bash
-/linear-swarm:linear-swarm PLAYKIT "Repo Hardening"
-/linear-swarm:linear-swarm ENGINEERING "Q2 Platform Work" --dry-run
+/linear-swarm:linear-swarm ENGINEERING "Q2 Platform Work"
+/linear-swarm:linear-swarm MOBILE "Auth Migration" --dry-run
 /linear-swarm:linear-swarm GROWTH "Landing Page Refresh" --worker=local
 /linear-swarm:linear-swarm PLATFORM "API v2" --worker=daytona --model=zai/glm-5.1
 ```

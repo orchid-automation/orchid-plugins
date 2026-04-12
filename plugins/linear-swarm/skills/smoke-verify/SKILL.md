@@ -31,9 +31,9 @@ The smoke script runs the REAL framework call path for 2-3 representative tools 
 ### 1. Scaffold the script if missing
 
 Check if `<repo>/scripts/verify_refactor.py` exists. If not, copy the template from this skill's directory (`verify_refactor.py.template`) and customize:
-- Swap `import mcp_slim` → the target module
-- Swap `mcp._tool_manager.list_tools()` → the target framework's inventory API
-- Swap `call_tool('get_pricing', {})` → the target framework's dispatch call
+- Swap `TARGET_MODULE_NAME` → the repo's main module (e.g., `app`, `server`, `mcp_slim`)
+- Swap `get_tool_names()` → the target framework's inventory API (FastMCP, FastAPI, Flask, etc.)
+- Swap `SMOKE_TOOLS` → 2-3 free endpoints/tools that can be called with no auth
 
 ### 2. Capture baseline from main
 
@@ -44,7 +44,7 @@ python3 scripts/verify_refactor.py --baseline
 #   - module import status
 #   - framework inventory (tool names, route paths, handler count)
 #   - known file line counts
-#   - decoupling grep matrix (e.g., "from mcp_slim" in tools/)
+#   - decoupling grep matrix (e.g., imports from the refactored-away module)
 ```
 
 ### 3. Copy script + baseline into every worktree

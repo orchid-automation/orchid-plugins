@@ -9,7 +9,7 @@ Usage:
     python3 daytona_worker.py \\
         --sandbox claude-sandbox \\
         --repo-url https://github.com/owner/repo.git \\
-        --branch brandon/playkit-35-fix-tests \\
+        --branch user/proj-101-fix-auth \\
         --model zai/glm-5.1 \\
         --brief-file /tmp/brief.md \\
         --vag-key $VERCEL_AI_GATEWAY_KEY \\

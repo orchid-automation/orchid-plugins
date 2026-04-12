@@ -22,18 +22,15 @@ The only way to catch ops drift is to **call the live service** with a **real au
 
 ## The failure case this skill exists for
 
-Today (2026-04-11) a real example:
-- PR #97 added `COOKIE_ENCRYPTION_KEY` fail-closed check to `utils/clay_api.py`
-- PR merged, deployed, `/health` stayed 200
-- All structural smoke passed
-- Ship signal confirmed
-- Then someone called `clay_status` via the live MCP:
-  ```
-  Error executing tool clay_status: COOKIE_ENCRYPTION_KEY must be set in production
-  ```
-- The env var was never set on Railway before the deploy. **Silent-broken deploy.**
+A PR adds a fail-closed check for a new env var (e.g., an encryption key). It merges, deploys, `/health` returns 200, all structural smoke passes, ship signal confirmed. Then a real client calls the service and gets:
 
-This skill would have caught it.
+```
+Error: REQUIRED_ENV_VAR must be set in production
+```
+
+The env var was never set on the deploy platform. **Silent-broken deploy.** This happens any time code adds a new ops dependency (env var, secret, feature flag, DB migration) without the ops side being configured first.
+
+This skill would have caught it. It calls the live service through a real client and specifically probes features that depend on ops config.
 
 ## Inputs
 
@@ -110,14 +107,13 @@ Reject responses that contain:
 
 ```
 === Prod Smoke Results ===
-Target: https://api.<service>.sh
+Target: https://api.your-service.sh
 Client: local MCP plugin pointing at prod
 
 ✓ health             → 200
-✓ get_pricing        → valid JSON (live Polar API call succeeded)
-✓ get_tool_costs     → 24 tools classified
-✓ find_integrations  → RAG + async knowledge search working
-✓ <ops-dependent>    → succeeded (cookie encryption key present)
+✓ free-tool-1       → valid JSON
+✓ free-tool-2       → valid response
+✓ <ops-dependent>    → succeeded (encryption key present)
 ✓ <feature flag>     → new feature path active
 ✓ <migration check>  → new columns populated
 
@@ -129,15 +125,15 @@ All production probes passing. Safe to close Linear issues.
 ```
 === Prod Smoke Results ===
 ✓ health             → 200
-✓ get_pricing        → valid JSON
-✗ clay_status        → Error: COOKIE_ENCRYPTION_KEY must be set in production
+✓ free-tool-1       → valid JSON
+✗ protected-tool    → Error: ENCRYPTION_KEY must be set in production
                        
-BLOCKER: env var missing on Railway. Setting COOKIE_ENCRYPTION_KEY now...
-  railway variables --set "COOKIE_ENCRYPTION_KEY=<generated>"
+BLOCKER: env var missing on deploy platform. Setting now...
+  <platform> variables --set "ENCRYPTION_KEY=<generated>"
   Waiting for redeploy...
   
 Retrying probes after redeploy...
-✓ clay_status        → 'Not connected. Call clay_connect(session_cookie=...) to connect.'
+✓ protected-tool    → succeeded
 
 All production probes passing. Safe to close Linear issues.
 ```
