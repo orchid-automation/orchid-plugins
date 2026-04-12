@@ -44,6 +44,58 @@ Do NOT use for:
 
 ---
 
+## Presentation Rules (CRITICAL — follow before executing ANY phase)
+
+The user sees YOUR TEXT OUTPUT as the primary experience. This must feel like watching a clean dashboard, not reading a terminal log.
+
+### What the user SHOULD see
+
+```
+Phase 0 — Scoping PLAYKIT "Infrastructure and observability"
+  ✓ Found 3 parent tasks (PLAYKIT-22, PLAYKIT-7, PLAYKIT-35)
+  ⚠ PLAYKIT-7 scored WEAK — prerequisites unchecked
+  ✓ Merge order: PLAYKIT-7 → PLAYKIT-22
+
+Phase 0.5 — Writing test specifications
+  ✓ PLAYKIT-22: 6 structural checks + 5 import smokes
+
+Phase 1 — Spinning up 2 workers (Daytona sandbox, GLM 5.1)
+  ● PLAYKIT-22 working...
+  ✓ PLAYKIT-22 committed — pipeline/kb.py created, all checks pass
+
+Phase 2 — Reviewing (compound-engineering fleet + Codex)
+  ✓ PLAYKIT-22: READY
+
+--dry-run: stopping before push.
+```
+
+### Rules
+
+1. **Print a clean phase header before each phase.** Format: `Phase N — <verb-phrase>`. No code, no file paths, no implementation detail.
+
+2. **Print ✓/✗/⚠/● status bullets** as steps complete. One line per meaningful result. ✓ = done, ✗ = failed, ⚠ = warning, ● = in progress.
+
+3. **NEVER expose raw implementation commands inline.** All `daytona exec`, `git`, `gh`, `base64` commands must be:
+   - Wrapped in plugin scripts (call via `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/daytona_worker.py ...`)
+   - Given short descriptive `description:` parameters on Bash tool calls (e.g., `description: "Wake sandbox"`)
+   - NOT chained with `&&` into 200-char mega-commands — split into separate calls with clean descriptions
+
+4. **Use TaskCreate/TaskUpdate** for phase tracking so the user sees visual progress:
+   ```
+   TaskCreate("Phase 0: Scope Linear issues")
+   TaskUpdate(taskId, status="in_progress")
+   ... work ...
+   TaskUpdate(taskId, status="completed")
+   ```
+
+5. **Agent descriptions must be human-readable:** `"PLAYKIT-22 knowledge refresh"` not `"Run task in worktree for issue"`.
+
+6. **Suppress intermediate output.** When calling scripts, pipe output to a temp file and only surface the summary line. Example: `python3 script.py > /tmp/log.txt 2>&1 && tail -1 /tmp/log.txt`
+
+7. **The golden rule:** if a tool call's `description` or visible output would confuse a non-engineer watching over the user's shoulder, rewrite it.
+
+---
+
 ## Phase 0 — Scope + Quality Audit
 
 1. Parse args. Resolve `<TEAM>` + `<PROJECT_NAME>` to a Linear project ID:

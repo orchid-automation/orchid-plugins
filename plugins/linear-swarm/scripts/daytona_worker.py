@@ -48,10 +48,18 @@ def dtx_py(sandbox: str, python_code: str) -> subprocess.CompletedProcess:
     parens survive zsh's re-tokenization on the Mac side.
     """
     b64 = base64.b64encode(python_code.encode()).decode()
-    # Write script to sandbox via echo+base64, then exec it (avoids all shell quoting)
-    write_cmd = f"echo {b64} | base64 -d > /tmp/_swarm_run.py"
-    run(["daytona", "exec", sandbox, "--", "bash", "-c", write_cmd], check=False)
-    return run(["daytona", "exec", sandbox, "--", "python3", "/tmp/_swarm_run.py"])
+    # Use shell=True so the user's login shell (zsh) handles escaping correctly.
+    # This is the exact pattern proven in the PLAYKIT-35 experiment.
+    cmd = (
+        f"daytona exec {sandbox} -- python3 -c "
+        f"'exec\\(__import__\\(\"base64\"\\).b64decode\\(\"{b64}\"\\).decode\\(\\)\\)'"
+    )
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    if result.returncode != 0:
+        sys.stderr.write(f"Worker failed (rc={result.returncode}):\n{result.stderr[-500:]}\n")
+    if result.stdout:
+        print(result.stdout)
+    return result
 
 
 def main() -> int:
