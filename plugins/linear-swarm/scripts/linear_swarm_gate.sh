@@ -5,7 +5,7 @@
 
 set -u
 
-# Claude Code hooks don't inherit shell profiles — source them as fallback
+# Extra fallback for env-heavy setups; keep this silent so hook output stays clean
 for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
   [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
 done
@@ -27,8 +27,10 @@ command -v git       >/dev/null 2>&1 || missing+=("git CLI")
 command -v gh        >/dev/null 2>&1 || missing+=("gh CLI (install with: brew install gh)")
 command -v python3   >/dev/null 2>&1 || missing+=("python3")
 
-if ! gh auth status >/dev/null 2>&1; then
-  missing+=("gh auth login (run 'gh auth login')")
+if [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
+  :
+elif ! gh auth status >/dev/null 2>&1; then
+  missing+=("GH_TOKEN/GITHUB_TOKEN env var or gh auth login")
 fi
 
 # Daytona is only required if --worker=daytona is in the prompt

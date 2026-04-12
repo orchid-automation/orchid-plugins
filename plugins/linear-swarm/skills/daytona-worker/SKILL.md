@@ -1,6 +1,6 @@
 ---
 name: daytona-worker
-description: Internal skill. Runs a headless Claude Code worker inside a Daytona sandbox with a cheap model (GLM 5.1 / Kimi K2.5 / MiniMax) via Vercel AI Gateway. Clones the target repo throwaway, executes a self-contained brief, commits, and pushes. Used by linear-swarm Phase 1 when --worker=daytona.
+description: Internal skill. Runs a headless Claude Code worker inside a Daytona sandbox with a cheap model (GLM 5.1 / Kimi K2.5 / MiniMax) via Vercel AI Gateway. Clones the target repo throwaway, executes a self-contained brief, commits, and pushes so the orchestrator can mirror the branch into a local worktree for later review, fix-up, smoke, and PR phases. Used by linear-swarm Phase 1 when --worker=daytona.
 user-invocable: false
 allowed-tools: Bash, Read, Write
 ---
@@ -29,7 +29,7 @@ This skill wraps the "headless Claude Code in a Daytona sandbox via Vercel AI Ga
 - `daytona` CLI installed and authenticated (`daytona login --api-key $DAYTONA_API_KEY`)
 - A sandbox exists and is reachable (default: `claude-sandbox`)
 - `VERCEL_AI_GATEWAY_KEY` set in env
-- `gh auth token` succeeds (we pass this token into the sandbox for clone + push)
+- `GH_TOKEN` / `GITHUB_TOKEN` is set, or `gh auth token` succeeds (we pass this token into the sandbox for clone + push)
 
 ## Steps
 
@@ -41,7 +41,7 @@ The sandbox ships with `claude` v2.1.19 pre-installed at `/usr/local/share/nvm/c
 
 ### 2. Throwaway clone
 ```bash
-GH_TOKEN=$(gh auth token)
+GH_TOKEN=${GH_TOKEN:-${GITHUB_TOKEN:-$(gh auth token)}}
 daytona exec claude-sandbox -- rm -rf /tmp/<repo>
 daytona exec claude-sandbox -- git clone --depth 1 \
   "https://$GH_TOKEN@github.com/<owner>/<repo>.git" /tmp/<repo>
@@ -94,7 +94,14 @@ daytona exec claude-sandbox -- python3 -c 'exec\(__import__\(\"base64\"\).b64dec
 daytona exec claude-sandbox -- git -C /tmp/<repo> diff --stat
 daytona exec claude-sandbox -- git -C /tmp/<repo> diff
 ```
-Send the diff back to the orchestrator for Phase 2 review.
+Send the diff back to the orchestrator, then mirror the pushed branch into a local worktree:
+
+```bash
+git fetch origin <branch>
+git worktree add .claude/worktrees/<ticket-id> -B <branch> FETCH_HEAD
+```
+
+All later phases operate on that local mirror worktree. Daytona is the Phase 1 implementation engine, not the long-lived fix-up environment.
 
 ### 6. Commit + push (via Python wrapper to avoid shell-quoting issues)
 
@@ -112,7 +119,7 @@ Then base64 + exec as in Step 4.
 **Important**: use `--force`, NOT `--force-with-lease`. The lease check rejects pushes from a sandbox with stale refs.
 
 ### 7. Report back
-Print the final commit hash + branch + test-spec pass/fail to the orchestrator.
+Print the final commit hash + branch + test-spec pass/fail to the orchestrator. The wrapper must exit non-zero if the Claude run, commit, or push failed; the orchestrator should never treat a failed sandbox run as READY.
 
 ## Model escalation (on smoke failure)
 
@@ -122,7 +129,7 @@ The orchestrator calls this skill with `model` picked from the ladder:
 3. `anthropic/claude-haiku-4.5` — guaranteed-compat
 4. Claude Opus via Max (orchestrator switches from Daytona to local worktree)
 
-On each failure, orchestrator re-invokes this skill with the next tier.
+On each failure, orchestrator re-invokes this skill with the next tier for a fresh Phase 1 attempt. Once the branch has been mirrored locally, later fix-up rounds happen in the local worktree, not by `SendMessage` to this one-shot skill.
 
 ## Known sandbox constraints
 

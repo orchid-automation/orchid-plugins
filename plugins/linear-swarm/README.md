@@ -11,6 +11,13 @@ Inspired by [Every Inc's compound-engineering-plugin](https://github.com/EveryIn
 /plugin install linear-swarm@orchid-plugins
 ```
 
+For local development, validate the plugin before testing it:
+
+```bash
+claude plugin validate ./plugins/linear-swarm
+claude --plugin-dir ./plugins/linear-swarm
+```
+
 ## Required environment
 
 Before running `/linear-swarm:linear-swarm`, set these:
@@ -21,9 +28,9 @@ Before running `/linear-swarm:linear-swarm`, set these:
 | `ANTHROPIC_API_KEY` (or Max subscription) | yes | Orchestrator Claude |
 | `VERCEL_AI_GATEWAY_KEY` | optional | Cheap-tier model access for Daytona workers |
 | `DAYTONA_API_KEY` | optional | Sandbox workers (alternative to local worktrees) |
-| `GH_TOKEN` or `gh auth login` | yes | Push branches + open PRs |
+| `GH_TOKEN` / `GITHUB_TOKEN` or `gh auth login` | yes | Push branches + open PRs |
 
-The plugin's `SessionStart` hook prints a preflight checklist. The `UserPromptSubmit` hook hard-blocks `/linear-swarm:*` commands when required credentials are missing.
+The plugin's `SessionStart` hook prints a preflight checklist. The `UserPromptSubmit` hook hard-blocks `/linear-swarm:*` commands when required credentials are missing. Missing Daytona setup is treated as optional unless you actually choose `--worker=daytona`.
 
 ## Graceful enhancement
 
@@ -67,6 +74,8 @@ Examples:
 | `--dry-run` | off | Run through plan + review + smoke, stop before push |
 | `--skip-codex` | off | Skip external Codex review (use only if Codex is unavailable) |
 
+When you use `--worker=daytona`, Phase 1 pushes the sandbox branch, then mirrors it into a local git worktree before review. Later fix-up, smoke, and PR phases run against that local mirror so the rest of the pipeline stays uniform.
+
 ## The 10 phases
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full phase-by-phase diagram.
@@ -75,7 +84,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full phase-by-phase dia
 1. **Plan per parent task** — Delegate to CE `workflows:plan` if installed, else inline
 2. **Fan-out** — One agent per parent task, in worktree OR Daytona sandbox
 3. **Review** — CE `workflows:review` + `codex:rescue --fresh`
-4. **Fix-up loop** — `SendMessage` same agents with exact findings; `codex:rescue --resume`
+4. **Fix-up loop** — reuse the same local worktree agent when possible; Daytona branches are mirrored locally before any fix-up
 5. **Structural smoke** — `scripts/verify_refactor.py` template against baseline
 6. **Push + PRs** — `gh pr create` per branch, Linear → In Review
 7. **Sequential merge ladder** — dependency-safe order, rebase on conflict, big refactor LAST

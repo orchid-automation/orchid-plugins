@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -104,7 +103,7 @@ def main() -> int:
 
     # 4. Run headless Claude via VAG with the brief, using the base64+exec pattern
     runner_py = f"""
-import subprocess, os
+import subprocess, os, sys
 env = os.environ.copy()
 env['ANTHROPIC_BASE_URL'] = 'https://ai-gateway.vercel.sh'
 env['ANTHROPIC_AUTH_TOKEN'] = {args.vag_key!r}
@@ -120,26 +119,38 @@ print(result.stdout)
 print('=== STDERR (last 2000) ===')
 print(result.stderr[-2000:])
 print('=== RC ===', result.returncode)
+if result.returncode != 0:
+    sys.exit(result.returncode)
 """
-    dtx_py(args.sandbox, runner_py)
+    runner_result = dtx_py(args.sandbox, runner_py)
+    if runner_result.returncode != 0:
+        return runner_result.returncode
 
     # 5. Commit + push via Python wrapper (avoids shell-quoting on commit message)
     commit_py = f"""
-import subprocess
+import subprocess, sys
 subprocess.run(['git', '-C', {work_dir!r}, 'add', '-A'], check=True)
-r = subprocess.run(
-    ['git', '-C', {work_dir!r}, 'commit', '-m', {args.commit_msg!r}],
-    capture_output=True, text=True
-)
-print('commit:', r.stdout, r.stderr)
-r2 = subprocess.run(
-    ['git', '-C', {work_dir!r}, 'push', '--force', 'origin', {args.branch!r}],
-    capture_output=True, text=True
-)
-print('push:', r2.stdout, r2.stderr)
-print('push rc:', r2.returncode)
+try:
+    r = subprocess.run(
+        ['git', '-C', {work_dir!r}, 'commit', '-m', {args.commit_msg!r}],
+        capture_output=True, text=True, check=True
+    )
+    print('commit:', r.stdout, r.stderr)
+    r2 = subprocess.run(
+        ['git', '-C', {work_dir!r}, 'push', '--force', 'origin', {args.branch!r}],
+        capture_output=True, text=True, check=True
+    )
+    print('push:', r2.stdout, r2.stderr)
+except subprocess.CalledProcessError as exc:
+    if exc.stdout:
+        print(exc.stdout)
+    if exc.stderr:
+        print(exc.stderr, file=sys.stderr)
+    sys.exit(exc.returncode or 1)
 """
-    dtx_py(args.sandbox, commit_py)
+    commit_result = dtx_py(args.sandbox, commit_py)
+    if commit_result.returncode != 0:
+        return commit_result.returncode
 
     # 6. Report final commit hash
     result = dtx(args.sandbox, ["git", "-C", work_dir, "rev-parse", "HEAD"])

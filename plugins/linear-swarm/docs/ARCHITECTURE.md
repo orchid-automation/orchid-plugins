@@ -59,15 +59,17 @@
 │       If --worker=daytona:                                             │
 │         Skill(linear-swarm:daytona-worker)                             │
 │         (cheap-tier model via Vercel AI Gateway in sandbox)            │
+│         → pushes branch, then orchestrator mirrors it into a           │
+│           local git worktree for later phases                          │
 │                                                                        │
-│  MODEL ESCALATION LADDER (on Phase 5 smoke failure):                   │
+│  MODEL ESCALATION LADDER (on Phase 4 smoke failure):                   │
 │    Tier 1:  zai/glm-5.1                  ← default                     │
 │    Tier 2:  moonshotai/kimi-k2.5                                       │
 │    Tier 3:  anthropic/claude-haiku-4.5                                 │
 │    Tier 4:  claude-opus via Max (switches to local worktree)           │
 │                                                                        │
-│  Each agent commits to brandon/<ticket-id>-<slug>. Orchestrator        │
-│  records {ticket_id, branch, agent_id, tier}.                          │
+│  Each task ends Phase 1 with a branch plus a LOCAL worktree.           │
+│  Orchestrator records {ticket_id, branch, mode, agent_id?, tier}.      │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │ all agents returned
                               ▼
@@ -100,11 +102,13 @@
 │  PHASE 3 — FIX-UP LOOP                                                 │
 │  ─────────────────────────────────────────────────────────────────    │
 │  For each NEEDS-CHANGES or BLOCKED branch:                             │
-│    SendMessage(to=<original agent_id>, ...)                            │
+│    local worker   → SendMessage(to=<original agent_id>, ...)           │
+│    daytona branch → spawn LOCAL worktree fix-up agent on mirror branch │
 │                                                                        │
 │  RULES:                                                                │
-│    - SendMessage, NOT Agent() — same agent, same worktree, same ctx   │
-│    - Escalate model tier if cheap-tier fails twice                    │
+│    - SendMessage only applies to long-lived local agents              │
+│    - Daytona workers are one-shot; later fix-ups run locally          │
+│    - Escalate model tier only when Phase 1 Daytona runs fail twice    │
 │    - Re-run Phase 2 with --resume (not --fresh) so Codex has context  │
 │    - Loop until all READY                                              │
 └─────────────────────────────┬─────────────────────────────────────────┘
@@ -117,7 +121,8 @@
 │                                                                        │
 │  1. scaffold scripts/verify_refactor.py from template if missing       │
 │  2. capture baseline from pre-change main                              │
-│  3. copy script + baseline to every worktree                           │
+│  3. copy script + baseline to every LOCAL worktree                     │
+│     (including Daytona mirror branches)                                │
 │  4. parallel: python3 scripts/verify_refactor.py --smoke               │
 │                                                                        │
 │  Smoke checks (all must pass):                                         │
@@ -136,7 +141,7 @@
 │  PHASE 5 — PUSH + PR                                                   │
 │  ─────────────────────────────────────────────────────────────────    │
 │  Parallel, per branch:                                                 │
-│    git push -u origin <branch>                                         │
+│    git push -u origin <branch>    # sync if Daytona already pushed     │
 │    gh pr create --base main --head <branch>                            │
 │                                                                        │
 │  Move each Linear issue: Todo/Backlog → In Review                      │
@@ -240,9 +245,9 @@
 │ scripts/preflight.sh       │  │ scripts/linear_swarm_gate  │
 │                            │  │                            │
 │ Soft-warns if any of:      │  │ Hard-blocks /linear-swarm  │
-│  - git / gh / daytona /    │  │ prompts when required      │
-│    python3 missing         │  │ prerequisites are missing. │
-│  - gh not authenticated    │  │                            │
+│  - git / gh / python3      │  │ prompts when required      │
+│    missing                 │  │ prerequisites are missing. │
+│  - GitHub auth missing     │  │                            │
 │  - VERCEL_AI_GATEWAY_KEY   │  │ Checks --worker=daytona    │
 │    not set (optional)      │  │ path specifically for      │
 │  - DAYTONA_API_KEY not     │  │ DAYTONA_API_KEY + VAG key  │
@@ -261,12 +266,14 @@
 │                            │  │ via Vercel AI Gateway.     │
 │ Customized per framework   │  │                            │
 │ by editing:                │  │ Handles shell-quoting traps│
-│  - TARGET_MODULE_NAME      │  │ that break plain            │
+│  - TARGET_MODULE_NAME      │  │ that break plain           │
 │  - get_tool_names()        │  │ `daytona exec` calls.      │
 │  - dispatch_tool()         │  │                            │
-│  - SMOKE_TOOLS list        │  │ Clones repo throwaway,     │
-│                            │  │ runs cheap model, commits, │
-│                            │  │ pushes, reports back.      │
+│  - SMOKE_TOOLS list        │  │ Must exit non-zero on      │
+│                            │  │ worker/commit/push errors. │
+│                            │  │ Successful runs push a     │
+│                            │  │ branch that gets mirrored  │
+│                            │  │ into a local worktree.     │
 └────────────────────────────┘  └────────────────────────────┘
 ```
 

@@ -152,7 +152,7 @@ This transforms the worker's job from "figure out what to do" → "make these te
 
 ## Phase 1 — Fan-Out
 
-Spawn **one agent per parent task** in parallel (all in a single tool message).
+Spawn **one execution unit per parent task** in parallel (all in a single tool message).
 
 ### Worker A — Local worktree (default, uses Claude Max)
 
@@ -177,6 +177,15 @@ Skill(linear-swarm:daytona-worker) with arg: {
   "brief": <self-contained brief>
 }
 ```
+
+**Important:** the Daytona worker is a Phase 1 transport. It pushes the branch from the sandbox, then the orchestrator immediately creates a **local mirror worktree** for that branch:
+
+```bash
+git fetch origin <branch>
+git worktree add .claude/worktrees/<ticket-id> -B <branch> FETCH_HEAD
+```
+
+From Phase 2 onward, review/fix-up/smoke/PR work runs against that local mirror so later phases have a normal branch + worktree to operate on.
 
 ### Self-contained brief template (per agent)
 
@@ -206,7 +215,9 @@ You are implementing Linear parent task <ID>: <title>.
 Do NOT push. Do NOT open a PR. Stop after committing.
 ```
 
-### Model escalation ladder (per-ticket, on failure of smoke in Phase 5)
+Local worktree agents follow that verbatim. Daytona workers use the same brief, but the wrapper handles the push automatically so the branch can be mirrored locally for later phases.
+
+### Model escalation ladder (per-ticket, on failure of smoke in Phase 4)
 
 ```
 Tier 1:  zai/glm-5.1                  ← default (best SWE-Bench Pro, Claude Code optimized)
@@ -215,7 +226,7 @@ Tier 3:  anthropic/claude-haiku-4.5   ← guaranteed-compat safety net
 Tier 4:  claude-opus (via Max)         ← reserved for tickets the cheap tiers keep failing
 ```
 
-Orchestrator records `{ticket_id, branch, agent_id, tier}` for Phases 4-7.
+Orchestrator records `{ticket_id, branch, execution_mode, agent_id?, local_worktree, tier}` for Phases 2-7.
 
 ---
 
@@ -253,6 +264,8 @@ Output: per-branch verdict `READY / NEEDS-CHANGES / BLOCKED` with specific file:
 
 For each NEEDS-CHANGES or BLOCKED branch:
 
+- If the branch came from a local Phase 1 agent, continue the same agent:
+
 ```
 SendMessage(
   to: <original agent_id from Phase 1>,
@@ -265,9 +278,24 @@ Report new commit hash in ≤180 words."
 )
 ```
 
+- If the branch came from Daytona, work from the mirrored local branch instead:
+
+```
+git fetch origin <branch>
+git worktree add .claude/worktrees/<ticket-id>-fix -B <branch> FETCH_HEAD
+Agent(
+  description: "<ticket-id> fix-up",
+  subagent_type: "general-purpose",
+  isolation: "worktree",
+  mode: "acceptEdits",
+  prompt: <same brief + exact review findings + latest test spec>
+)
+```
+
 **Rules:**
-- `SendMessage`, NOT `Agent()` — continue the SAME agent in the SAME worktree with the SAME context. A fresh spawn costs full re-onboarding.
-- **Escalate model tier** when a cheap-tier worker's fix-up also fails smoke: tier 1 → tier 2 → tier 3.
+- `SendMessage` is only for long-lived local worktree agents. Do NOT try to `SendMessage` a one-shot Daytona skill run.
+- Daytona branches must exist as local mirror worktrees before entering Phase 2, so every later phase has a normal branch checkout.
+- **Escalate model tier** only for repeated Phase 1 Daytona failures. Once a branch is mirrored locally, later fix-ups stay local unless you explicitly choose to restart Phase 1.
 - Re-run Phase 2 with `--resume` (not `--fresh`) so Codex continues the prior review thread with context.
 - Loop until all READY. Usually 1-2 rounds.
 
@@ -283,7 +311,7 @@ Skill(linear-swarm:smoke-verify)
 It:
 1. Scaffolds `scripts/verify_refactor.py` in the target repo if missing (from template)
 2. Captures a baseline from current `main`
-3. Copies script + baseline into each worktree
+3. Copies script + baseline into each local worktree, including Daytona mirror worktrees
 4. Runs `python3 scripts/verify_refactor.py --smoke` in parallel across every worktree
 5. Asserts: module imports cleanly, framework inventory matches baseline, decoupling holds, **live tool dispatch through real framework call path returns valid JSON** (not error-prefix strings)
 
@@ -302,6 +330,8 @@ gh pr create --base main --head <branch> \
   --title "<conventional commit>" \
   --body <summary + Linear link + test plan>
 ```
+
+For Daytona-origin branches, the first push already happened in Phase 1. Phase 5 simply syncs any local mirror fixes before opening the PR.
 
 After all PRs open:
 - Print PR URL table
@@ -429,6 +459,7 @@ This is what makes the pattern truly compound: every run writes learnings the ne
 | Failure | Recovery |
 |---|---|
 | Agent never commits | `SendMessage` with "you haven't committed yet, run git add + commit now" |
+| Daytona worker exits non-zero | Stop immediately, surface sandbox stderr, fix the wrapper/input, then rerun Phase 1 |
 | Codex unreachable | `--skip-codex` flag falls back to bundled reviewers only |
 | Structural smoke fails after fix-up | `SendMessage` the agent with the exact assertion that broke; escalate model tier if persistent |
 | Merge conflict cascade | Halt ladder, rebase + smoke + force-push, continue |

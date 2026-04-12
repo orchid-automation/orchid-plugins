@@ -142,26 +142,36 @@ def run_smoke_tests(module) -> list[str]:
             print(f"  ✗ {name}: {payload}")
             failures.append(f"{name} raised")
             continue
-        if not isinstance(payload, str) or not payload.strip():
-            print(f"  ✗ {name}: empty/non-string return ({type(payload).__name__})")
-            failures.append(f"{name} empty/non-string")
-            continue
-        stripped = payload.lstrip()
-        looks_like_error = stripped.lower().startswith(("error", "traceback"))
-        parses_as_json = False
-        if stripped.startswith(("{", "[")):
+        if isinstance(payload, str):
+            payload_text = payload.strip()
+            if not payload_text:
+                print(f"  ✗ {name}: empty string return")
+                failures.append(f"{name} empty string")
+                continue
             try:
-                json.loads(stripped)
-                parses_as_json = True
+                decoded = json.loads(payload_text)
             except Exception:
-                parses_as_json = False
-        if looks_like_error or not parses_as_json:
-            preview = stripped.splitlines()[0][:120]
-            print(f"  ✗ {name}: {len(payload)} chars — {preview!r}")
-            failures.append(f"{name} returned error/non-JSON payload")
+                preview = payload_text.splitlines()[0][:120]
+                print(f"  ✗ {name}: {len(payload_text)} chars — {preview!r}")
+                failures.append(f"{name} returned non-JSON string payload")
+                continue
+        else:
+            try:
+                payload_text = json.dumps(payload)
+                decoded = payload
+            except TypeError:
+                print(f"  ✗ {name}: non-JSON-serializable return ({type(payload).__name__})")
+                failures.append(f"{name} non-JSON-serializable payload")
+                continue
+
+        if isinstance(decoded, str) and decoded.lstrip().lower().startswith(("error", "traceback")):
+            preview = decoded.splitlines()[0][:120]
+            print(f"  ✗ {name}: error payload — {preview!r}")
+            failures.append(f"{name} returned error payload")
             continue
-        preview = stripped.splitlines()[0][:80]
-        print(f"  ✓ {name}: {len(payload)} chars — {preview!r}")
+
+        preview = payload_text.splitlines()[0][:80]
+        print(f"  ✓ {name}: {len(payload_text)} chars — {preview!r}")
     return failures
 
 

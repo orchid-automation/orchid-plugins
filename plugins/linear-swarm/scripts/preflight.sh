@@ -5,7 +5,7 @@
 
 set -u
 
-# Claude Code hooks don't inherit shell profiles — source them as fallback
+# Extra fallback for env-heavy setups; keep this silent so hook output stays clean
 for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
   [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
 done
@@ -13,33 +13,37 @@ done
 warn() { printf '  ⚠ %s\n' "$1"; }
 ok()   { printf '  ✓ %s\n' "$1"; }
 
-missing=0
+blocking_missing=0
+optional_missing=0
 
-# CLIs
-for tool in git gh daytona python3; do
+# CLIs required for the default local flow
+for tool in git gh python3; do
   if command -v "$tool" >/dev/null 2>&1; then
     ok "$tool found"
   else
     warn "$tool NOT found (required for linear-swarm)"
-    missing=$((missing + 1))
+    blocking_missing=$((blocking_missing + 1))
   fi
 done
 
 # Optional CLIs
-for tool in gitingest jq; do
+for tool in daytona gitingest jq; do
   if command -v "$tool" >/dev/null 2>&1; then
     ok "$tool found (optional)"
   else
     warn "$tool not found (optional — used by some linear-swarm paths)"
+    optional_missing=$((optional_missing + 1))
   fi
 done
 
-# gh auth
-if gh auth status >/dev/null 2>&1; then
+# GitHub auth
+if [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
+  ok "GitHub token auth available"
+elif gh auth status >/dev/null 2>&1; then
   ok "gh authenticated"
 else
-  warn "gh not authenticated — run 'gh auth login'"
-  missing=$((missing + 1))
+  warn "GitHub auth missing — set GH_TOKEN/GITHUB_TOKEN or run 'gh auth login'"
+  blocking_missing=$((blocking_missing + 1))
 fi
 
 # Env vars
@@ -50,7 +54,7 @@ check_env() {
     ok "$name set"
   elif [ "$required" = "required" ]; then
     warn "$name NOT set (required)"
-    missing=$((missing + 1))
+    blocking_missing=$((blocking_missing + 1))
   else
     warn "$name not set (optional)"
   fi
@@ -61,8 +65,10 @@ check_env() {
 check_env "VERCEL_AI_GATEWAY_KEY" "optional"
 check_env "DAYTONA_API_KEY" "optional"
 
-if [ "$missing" -gt 0 ]; then
-  printf '\n  linear-swarm: %d missing prerequisite(s). /linear-swarm will be blocked until fixed.\n\n' "$missing" >&2
+if [ "$blocking_missing" -gt 0 ]; then
+  printf '\n  linear-swarm: %d blocking prerequisite(s). /linear-swarm will be blocked until fixed.\n\n' "$blocking_missing" >&2
+elif [ "$optional_missing" -gt 0 ]; then
+  printf '\n  linear-swarm: local worktree mode is available. Optional Daytona-only dependencies are still missing.\n\n' >&2
 fi
 
 # Always exit 0 — this is a soft warning hook
