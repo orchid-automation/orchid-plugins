@@ -6,5 +6,19 @@
   "homepage": "https://github.com/orchid-automation/orchid-plugins",
   "repository": "https://github.com/orchid-automation/orchid-plugins",
   "license": "MIT",
-  "keywords": ["linear", "workflow", "orchestration", "parallel-agents", "worktrees", "daytona", "codex-review", "compound-engineering", "shipping", "meta-meta"]
+  "keywords": ["linear", "workflow", "orchestration", "parallel-agents", "worktrees", "daytona", "codex-review", "compound-engineering", "shipping"],
+  "userConfig": {
+    "vercel_ai_gateway_key": {
+      "description": "Vercel AI Gateway API key (for cheap-tier Daytona workers). Get one at https://vercel.com/ai-gateway",
+      "sensitive": true
+    },
+    "daytona_api_key": {
+      "description": "Daytona API key (for cloud sandbox workers). Get one at https://app.daytona.io",
+      "sensitive": true
+    },
+    "linear_api_key": {
+      "description": "Linear API key (for posting progress comments). Get one at https://linear.app/settings/api",
+      "sensitive": true
+    }
+  }
 }

@@ -89,12 +89,24 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
 
 2. **Print ✓/✗/⚠/● status bullets** as steps complete. One line per meaningful result. ✓ = done, ✗ = failed, ⚠ = warning, ● = in progress.
 
-3. **NEVER expose raw implementation commands inline.** All `daytona exec`, `git`, `gh`, `base64` commands must be:
-   - Wrapped in plugin scripts (call via `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/daytona_worker.py ...`)
-   - Given short descriptive `description:` parameters on Bash tool calls (e.g., `description: "Wake sandbox"`)
-   - NOT chained with `&&` into 200-char mega-commands — split into separate calls with clean descriptions
+3. **Every Bash tool call MUST have a `description:` parameter.** The description is what the user sees in the UI — not the command. Examples of GOOD descriptions:
+   - `description: "Spinning up Daytona worker for SEND-82"`
+   - `description: "Writing test spec for SEND-83"`
+   - `description: "Pushing 3 branches to origin"`
+   - `description: "Merging PR #127"`
+   - `description: "Checking deploy status"`
 
-4. **Use TaskCreate/TaskUpdate** for phase tracking so the user sees visual progress:
+   Examples of BAD (never do this):
+   - `description: "Run command"` — too vague
+   - No description at all — user sees raw command
+   - `description: "daytona exec claude-sandbox -- git..."` — just repeating the command
+
+4. **Use `bin/` commands, NEVER write Python scripts.** The plugin ships executables on PATH:
+   - `daytona-worker --repo R --branch B --brief F --commit-msg M` — full sandbox lifecycle
+   - `linear-comment --issue ID --body "message"` — post to Linear
+   These are one-liners. Do NOT write wrapper scripts, do NOT use base64 encoding, do NOT bake API keys into generated code. All credentials come from env vars automatically.
+
+5. **Use TaskCreate/TaskUpdate** for phase tracking so the user sees visual progress:
    ```
    TaskCreate("Phase 1: Scope Linear issues")
    TaskUpdate(taskId, status="in_progress")
@@ -102,13 +114,17 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
    TaskUpdate(taskId, status="completed")
    ```
 
-5. **Agent descriptions must be human-readable:** `"ACME-101 auth migration"` not `"Run task in worktree for issue"`.
+6. **Agent descriptions must be human-readable:** `"ACME-101 auth migration"` not `"Run task in worktree for issue"`.
 
-6. **Suppress intermediate output.** When calling scripts, pipe output to a temp file and only surface the summary line. Example: `python3 script.py > /tmp/log.txt 2>&1 && tail -1 /tmp/log.txt`
+7. **Suppress intermediate output.** When calling bin/ scripts, pipe to a log and surface only the summary:
+   ```
+   Bash(command: "daytona-worker ... > /tmp/worker-SEND-82.log 2>&1 && tail -1 /tmp/worker-SEND-82.log",
+        description: "Running Daytona worker for SEND-82")
+   ```
 
-7. **The golden rule:** if a tool call's `description` or visible output would confuse a non-engineer watching over the user's shoulder, rewrite it.
+8. **The golden rule:** if a tool call's `description` or visible output would confuse someone watching over the user's shoulder, rewrite it.
 
-8. **Post Linear comments at every phase gate.** This creates an audit trail visible to anyone on the team — not just whoever's watching the Claude Code session. Use `mcp__linear__save_comment` from the orchestrator at:
+9. **Post Linear comments at every phase gate.** This creates an audit trail visible to anyone on the team — not just whoever's watching the Claude Code session. Use `mcp__linear__save_comment` from the orchestrator at:
    - Phase 1 complete: `"[scope] Picked up by linear-swarm — worker: <mode>, model: <model>"`
    - Phase 3 complete: `"✓ Worker committed: <hash> — <summary of changes>"`
    - Phase 4 complete: `"[review] Review verdict: READY"` or `"⚠ Review: NEEDS-CHANGES — <finding>"`
