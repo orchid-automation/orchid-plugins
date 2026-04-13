@@ -108,6 +108,15 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
 
 7. **The golden rule:** if a tool call's `description` or visible output would confuse a non-engineer watching over the user's shoulder, rewrite it.
 
+8. **Post Linear comments at every phase gate.** This creates an audit trail visible to anyone on the team — not just whoever's watching the Claude Code session. Use `mcp__linear__save_comment` from the orchestrator at:
+   - Phase 1 complete: `"📋 Picked up by linear-swarm — worker: <mode>, model: <model>"`
+   - Phase 3 complete: `"✓ Worker committed: <hash> — <summary of changes>"`
+   - Phase 4 complete: `"🔍 Review verdict: READY"` or `"⚠ Review: NEEDS-CHANGES — <finding>"`
+   - Phase 7 complete: `"📤 PR #<n> opened: <url>"`
+   - Phase 8 complete: `"✅ Merged to main"`
+   - Phase 9 complete: `"🚀 Deployed + prod smoke passed"`
+   Daytona workers post their own mid-work comments via the injected `linear_comment()` helper. Non-fatal — never block a phase on a failed comment.
+
 ---
 
 ## Phase 1 — Scope + Quality Audit

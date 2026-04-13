@@ -79,6 +79,10 @@ def main() -> int:
     p.add_argument("--gh-token", required=True, help="GitHub token for clone + push")
     p.add_argument("--commit-msg", required=True)
     p.add_argument("--timeout", type=int, default=900)
+    p.add_argument("--linear-key", default=os.environ.get("LINEAR_API_KEY", ""),
+                   help="Linear API key for posting progress comments (optional)")
+    p.add_argument("--linear-issue", default="",
+                   help="Linear issue ID for progress comments (e.g., PROJ-42)")
     args = p.parse_args()
 
     repo_name = args.repo_name or args.repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
@@ -101,9 +105,36 @@ def main() -> int:
     dtx(args.sandbox, ["git", "-C", work_dir, "config", "user.name", "orchid-linear-swarm"])
     dtx(args.sandbox, ["git", "-C", work_dir, "checkout", "-b", args.branch])
 
-    # 4. Run headless Claude via VAG with the brief, using the base64+exec pattern
+    # 4. Build Linear comment helper (injected into sandbox runner if key provided)
+    linear_helper = ""
+    if args.linear_key and args.linear_issue:
+        linear_helper = f"""
+import urllib.request, json as _json
+
+def linear_comment(body):
+    \"\"\"Post a progress comment to the Linear issue.\"\"\"
+    try:
+        escaped = body.replace('\\\\', '\\\\\\\\').replace('"', '\\\\"').replace('\\n', '\\\\n')
+        q = {{"query": 'mutation {{ commentCreate(input: {{issueId: "{args.linear_issue}", body: "' + escaped + '"}}) {{ success }} }}'}}
+        req = urllib.request.Request("https://api.linear.app/graphql",
+            data=_json.dumps(q).encode(), headers={{"Authorization": {args.linear_key!r}, "Content-Type": "application/json"}})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:
+        pass  # non-fatal — don't block work on comment failures
+"""
+    else:
+        linear_helper = """
+def linear_comment(body):
+    pass  # Linear commenting disabled (no key/issue provided)
+"""
+
+    # 5. Run headless Claude via VAG with the brief, using the base64+exec pattern
     runner_py = f"""
 import subprocess, os, sys
+{linear_helper}
+
+linear_comment("🔧 Worker started — model: {args.model}")
+
 env = os.environ.copy()
 env['ANTHROPIC_BASE_URL'] = 'https://ai-gateway.vercel.sh'
 env['ANTHROPIC_AUTH_TOKEN'] = {args.vag_key!r}
@@ -119,7 +150,11 @@ print(result.stdout)
 print('=== STDERR (last 2000) ===')
 print(result.stderr[-2000:])
 print('=== RC ===', result.returncode)
-if result.returncode != 0:
+
+if result.returncode == 0:
+    linear_comment("✓ Worker completed — edits ready for review")
+else:
+    linear_comment("✗ Worker failed (rc=" + str(result.returncode) + ")")
     sys.exit(result.returncode)
 """
     runner_result = dtx_py(args.sandbox, runner_py)
