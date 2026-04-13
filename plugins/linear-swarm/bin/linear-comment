@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# linear-comment — post a comment to a Linear issue
+#
+# Usage:
+#   linear-comment --issue SEND-82 --body "Worker completed"
+#
+# Reads LINEAR_API_KEY from env (set in ~/.zshenv).
+
+set -euo pipefail
+
+for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
+  [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
+done
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/../scripts" && pwd)"
+exec python3 "$SCRIPT_DIR/linear_comment.py" --key "${LINEAR_API_KEY:-}" "$@"

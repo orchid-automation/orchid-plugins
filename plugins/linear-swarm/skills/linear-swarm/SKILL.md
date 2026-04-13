@@ -197,7 +197,9 @@ This transforms the worker's job from "figure out what to do" → "make these te
 
 ## Phase 3 — Fan-Out
 
-Spawn **one execution unit per parent task** in parallel (all in a single tool message).
+Spawn **one execution unit per work item** in parallel.
+
+**CRITICAL RULE: NEVER write Python wrapper scripts for workers.** The plugin ships prebaked executables in `bin/` that are on your PATH. Use them.
 
 ### Worker A — Local worktree (default, uses Claude Max)
 
@@ -207,32 +209,52 @@ Agent(
   subagent_type: "general-purpose",
   isolation: "worktree",
   mode: "acceptEdits",
-  prompt: <self-contained brief>
+  prompt: <contents of the brief file you wrote>
 )
 ```
 
-### Worker B — Daytona sandbox (cheap-tier, requires `DAYTONA_API_KEY` + `VERCEL_AI_GATEWAY_KEY`)
+### Worker B — Daytona sandbox (cheap-tier)
 
-Delegate to the `daytona-worker` skill in this plugin:
-```
-Skill(linear-swarm:daytona-worker) with arg: {
-  "ticket_id": "<ticket-id>",
-  "branch": "<gitBranchName from Linear>",
-  "model": "<--model arg or default>",
-  "brief": <self-contained brief>
-}
+**Step 1:** Write the brief to a temp file. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/worker-brief.md` as the base — fill in the `{{VARIABLES}}` with the ticket data. Example:
+
+```bash
+# Copy template + fill in variables
+cp ${CLAUDE_PLUGIN_ROOT}/templates/worker-brief.md /tmp/brief-SEND-82.md
+# Then edit the file to replace {{TICKET_IDS}}, {{TASK_DESCRIPTION}}, etc.
 ```
 
-**Important:** the Daytona worker is a Phase 3 transport. It pushes the branch from the sandbox, then the orchestrator immediately creates a **local mirror worktree** for that branch:
+Or just Write() the brief directly — the template shows the expected format.
+
+**Step 2:** Call `daytona-worker` (one command, in PATH via plugin `bin/`):
+
+```bash
+daytona-worker \
+  --repo orchidautomation/sendlens \
+  --branch brandon/send-82-elements \
+  --brief /tmp/brief-SEND-82.md \
+  --commit-msg "feat: install PromptInput and Suggestions (SEND-82, SEND-86)" \
+  --linear-issue SEND-82
+```
+
+That's it. The script handles: wake sandbox, clone, branch, inject credentials, run Claude with the model, commit, push, post Linear comment. **All credentials come from env vars — never pass keys in arguments or generated code.**
+
+For parallel workers, run multiple `daytona-worker` calls as background Bash commands. Each gets its own clone dir inside the sandbox automatically.
+
+**Step 3:** After push, mirror into local worktree for later phases:
 
 ```bash
 git fetch origin <branch>
 git worktree add .claude/worktrees/<ticket-id> -B <branch> FETCH_HEAD
 ```
 
-From Phase 4 onward, review/fix-up/smoke/PR work runs against that local mirror so later phases have a normal branch + worktree to operate on.
+### Available bin/ commands (all on PATH, all read creds from env)
 
-### Self-contained brief template (per agent)
+| Command | What it does |
+|---|---|
+| `daytona-worker --repo R --branch B --brief F --commit-msg M` | Full sandbox worker lifecycle |
+| `linear-comment --issue ID --body "message"` | Post a comment to a Linear issue |
+
+### Brief format (per agent)
 
 ```
 You are implementing Linear parent task <ID>: <title>.
