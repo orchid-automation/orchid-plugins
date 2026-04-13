@@ -53,16 +53,25 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 
 ## Usage
 
+### Project mode — fan out by parent tasks
 ```bash
 /linear-swarm:linear-swarm <TEAM> <PROJECT_NAME>
 ```
 
-Examples:
+### Issue mode — fan out by subtasks of a parent issue
 ```bash
+/linear-swarm:linear-swarm <ISSUE-ID>
+```
+
+### Examples
+```bash
+# Project mode
 /linear-swarm:linear-swarm ENGINEERING "Q2 Platform Work"
 /linear-swarm:linear-swarm MOBILE "Auth Migration" --dry-run
-/linear-swarm:linear-swarm GROWTH "Landing Page Refresh" --worker=local
-/linear-swarm:linear-swarm PLATFORM "API v2" --worker=daytona --model=zai/glm-5.1
+
+# Issue mode (epic with subtasks)
+/linear-swarm:linear-swarm ENG-66
+/linear-swarm:linear-swarm PROJ-142 --worker=daytona --model=zai/glm-5.1
 ```
 
 ## Flags
@@ -80,17 +89,16 @@ When you use `--worker=daytona`, Phase 1 pushes the sandbox branch, then mirrors
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full phase-by-phase diagram.
 
-0. **Scope** — Read Linear, quality-audit every parent task + subtask, user confirm
-1. **Plan per parent task** — Delegate to CE `workflows:plan` if installed, else inline
-2. **Fan-out** — One agent per parent task, in worktree OR Daytona sandbox
-3. **Review** — CE `workflows:review` + `codex:rescue --fresh`
-4. **Fix-up loop** — reuse the same local worktree agent when possible; Daytona branches are mirrored locally before any fix-up
-5. **Structural smoke** — `scripts/verify_refactor.py` template against baseline
-6. **Push + PRs** — `gh pr create` per branch, Linear → In Review
-7. **Sequential merge ladder** — dependency-safe order, rebase on conflict, big refactor LAST
-8. **Deploy + version probe** — poll `/health` until new-code signal appears
-9. **Prod smoke** — call live service through real client; catches ops-config regressions
-10. **Cleanup + Compound** — worktree/branch cleanup, Linear → Done, CE `workflows:compound` or `docs/solutions/` write-back
+1. **Scope + Quality Audit** — Read Linear (project or parent issue), quality-audit every work item, user confirm
+2. **Test Design** — Orchestrator writes test specs per ticket before any agent spawns
+3. **Fan-Out** — One agent per work item, in worktree OR Daytona sandbox
+4. **Review** — CE `workflows:review` + `codex:rescue --fresh`
+5. **Fix-Up Loop** — reuse same agent with review findings; Daytona branches mirrored locally
+6. **Structural Smoke** — `scripts/verify_refactor.py` against baseline + real framework dispatch
+7. **Push + PRs** — `gh pr create` per branch, Linear → In Review
+8. **Merge Ladder** — dependency-safe order, rebase on conflict, big refactor LAST
+9. **Deploy + Prod Verify** — poll `/health`, version signal, then real-client prod smoke
+10. **Compound + Cleanup** — write learnings, worktree/branch cleanup, Linear → Done
 
 ## What makes this different from CE alone
 
