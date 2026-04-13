@@ -133,7 +133,7 @@ def linear_comment(body):
 import subprocess, os, sys
 {linear_helper}
 
-linear_comment("🔧 Worker started — model: {args.model}")
+linear_comment("[worker] Worker started — model: {args.model}")
 
 env = os.environ.copy()
 env['ANTHROPIC_BASE_URL'] = 'https://ai-gateway.vercel.sh'
