@@ -87,7 +87,8 @@ When you use `--worker=daytona`, Phase 1 pushes the sandbox branch, then mirrors
 
 ## The 10 phases
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full phase-by-phase diagram.
+- **New here?** Start with [docs/DEMO.md](docs/DEMO.md) — a student-friendly walkthrough with ASCII diagrams for every step.
+- **Reference?** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full phase-by-phase diagram.
 
 1. **Scope + Quality Audit** — Read Linear (project or parent issue), quality-audit every work item, user confirm
 2. **Test Design** — Orchestrator writes test specs per ticket before any agent spawns
