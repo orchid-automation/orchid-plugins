@@ -1,6 +1,6 @@
 # Linear Swarm
 
-Ship a whole Linear project in one session. Fan out parallel agents across worktrees or Daytona sandboxes, audit with Codex + specialist reviewers, run a structural smoke script, sequentially merge PRs, deploy, and verify against live production.
+Ship a whole Linear project in one session. Fan out parallel agents across local worktrees or Sandcastle-powered Vercel Sandboxes, audit with Codex + specialist reviewers, run a structural smoke script, sequentially merge PRs, deploy, and verify against live production.
 
 Inspired by [Every Inc's compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin). Gracefully delegates to their workflows when both plugins are installed; falls back to bundled reviewers otherwise.
 
@@ -22,15 +22,18 @@ claude --plugin-dir ./plugins/linear-swarm
 
 Before running `/linear-swarm:linear-swarm`, set these:
 
-| Env var | Required | Purpose |
+| Env var / setup | Required | Purpose |
 |---|---|---|
 | `LINEAR_API_KEY` or Linear MCP configured | yes | Read project + issues |
 | `ANTHROPIC_API_KEY` (or Max subscription) | yes | Orchestrator Claude |
-| `VERCEL_AI_GATEWAY_KEY` | optional | Cheap-tier model access for Daytona workers |
-| `DAYTONA_API_KEY` | optional | Sandbox workers (alternative to local worktrees) |
 | `GH_TOKEN` / `GITHUB_TOKEN` or `gh auth login` | yes | Push branches + open PRs |
+| clean git working tree | yes | Sandcastle branches from the local checkout |
+| `VERCEL_AI_GATEWAY_KEY` | sandbox only | Cheap-tier model access for sandbox workers |
+| `VERCEL_OIDC_TOKEN` | sandbox only | Preferred Vercel Sandbox auth |
+| `VERCEL_TOKEN` + `VERCEL_TEAM_ID` + `VERCEL_PROJECT_ID` | sandbox only | Token-based Vercel Sandbox auth |
+| logged-in Vercel CLI + linked `.vercel/project.json` | sandbox only | The worker can reuse your local Vercel CLI token and linked project metadata |
 
-The plugin's `SessionStart` hook prints a preflight checklist. The `UserPromptSubmit` hook hard-blocks `/linear-swarm:*` commands when required credentials are missing. Missing Daytona setup is treated as optional unless you actually choose `--worker=daytona`.
+The plugin's `SessionStart` hook prints a preflight checklist. The `UserPromptSubmit` hook hard-blocks `/linear-swarm:*` commands when required credentials are missing. Sandbox runtime/auth setup is treated as optional unless you explicitly choose `--worker=sandbox`.
 
 ## Graceful enhancement
 
@@ -71,19 +74,21 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 
 # Issue mode (epic with subtasks)
 /linear-swarm:linear-swarm ENG-66
-/linear-swarm:linear-swarm PROJ-142 --worker=daytona --model=zai/glm-5.1
+/linear-swarm:linear-swarm PROJ-142 --worker=sandbox --model=zai/glm-5.1
 ```
 
 ## Flags
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--worker=local\|daytona` | `local` | Execute in local git worktrees (Claude Max) or Daytona sandboxes (cheap tier) |
-| `--model=<slug>` | `zai/glm-5.1` | Tier-1 model when `--worker=daytona` |
+| `--worker=local\|sandbox` | `local` | Execute in local git worktrees (Claude Max) or Vercel Sandboxes (cheap tier) |
+| `--model=<slug>` | `zai/glm-5.1` | Tier-1 model when `--worker=sandbox` |
 | `--dry-run` | off | Run through plan + review + smoke, stop before push |
 | `--skip-codex` | off | Skip external Codex review (use only if Codex is unavailable) |
 
-When you use `--worker=daytona`, Phase 1 pushes the sandbox branch, then mirrors it into a local git worktree before review. Later fix-up, smoke, and PR phases run against that local mirror so the rest of the pipeline stays uniform.
+`--worker=daytona` is still accepted as a deprecated alias for `--worker=sandbox` so older prompts do not break.
+
+When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the result back onto a local git branch, and leaves the rest of the workflow uniform. Review, fix-up, smoke, PR, and merge phases all operate on normal local branches and worktrees.
 
 ## The 10 phases
 
@@ -92,9 +97,9 @@ When you use `--worker=daytona`, Phase 1 pushes the sandbox branch, then mirrors
 
 1. **Scope + Quality Audit** — Read Linear (project or parent issue), quality-audit every work item, user confirm
 2. **Test Design** — Orchestrator writes test specs per ticket before any agent spawns
-3. **Fan-Out** — One agent per work item, in worktree OR Daytona sandbox
+3. **Fan-Out** — One agent per work item, in worktree OR sandbox
 4. **Review** — CE `workflows:review` + `codex:rescue --fresh`
-5. **Fix-Up Loop** — reuse same agent with review findings; Daytona branches mirrored locally
+5. **Fix-Up Loop** — reuse same agent with review findings; sandbox branches stay local after sync-back
 6. **Structural Smoke** — `scripts/verify_refactor.py` against baseline + real framework dispatch
 7. **Push + PRs** — `gh pr create` per branch, Linear → In Review
 8. **Merge Ladder** — dependency-safe order, rebase on conflict, big refactor LAST
@@ -104,7 +109,7 @@ When you use `--worker=daytona`, Phase 1 pushes the sandbox branch, then mirrors
 ## What makes this different from CE alone
 
 - **Linear as source of truth** — CE reads from `docs/brainstorms/` on disk; this reads Linear tickets (team, mobile, multi-user)
-- **Daytona sandbox workers** — run cheap-tier models ($0.30/M) inside isolated sandboxes via Vercel AI Gateway, preserving your Claude Max quota for orchestration and synthesis
+- **Sandcastle + Vercel Sandbox workers** — run cheap-tier models via Vercel AI Gateway while syncing results back onto normal local branches
 - **Cross-code/ops prod verify** — Phase 9 catches ops-config regressions (missing env vars, feature flags) that every structural test will miss
 
 ## Attribution

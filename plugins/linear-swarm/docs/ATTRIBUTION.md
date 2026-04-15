@@ -16,7 +16,7 @@ Linear Swarm is heavily inspired by, and designed to interoperate with, [Every I
 ## What we add that CE doesn't have
 
 - **Linear API as the entry point** (CE reads from `docs/brainstorms/` on disk — we read parent tasks + subtasks from Linear)
-- **Daytona sandbox workers with cheap-tier models** via Vercel AI Gateway (CE uses local worktrees exclusively)
+- **Sandcastle + Vercel Sandbox workers with cheap-tier models** via Vercel AI Gateway (CE uses local worktrees exclusively)
 - **Phase 8 prod verify** — call the live deployed service through a real authenticated client to catch ops-config regressions that every structural test misses
 - **Model escalation ladder** (GLM 5.1 → Kimi K2.5 → Haiku 4.5 → Opus) when cheap-tier workers fail structural smoke
 - **`--fresh`/`--resume` discipline** for `codex:rescue` calls so the automation never halts on `AskUserQuestion`

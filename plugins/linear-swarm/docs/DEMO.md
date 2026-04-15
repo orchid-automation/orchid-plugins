@@ -34,7 +34,7 @@ reference architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 ## What you'll see during the demo
 
 ```
-You type  ▶  /linear-swarm PLAYKIT "Infrastructure and observability" --worker=daytona
+You type  ▶  /linear-swarm PLAYKIT "Infrastructure and observability" --worker=sandbox
 
 Claude    ▶  Phase 0 — scope audit        [~30s]
 Claude    ▶  quality table + merge plan   [~gate: you say "go"]
@@ -73,7 +73,9 @@ Total: ~15–20 minutes for what normally takes a week.
                                ▼
                    optional cheap-tier workers
                    ┌────────────────────────┐
-                   │ DAYTONA_API_KEY        │  ← cloud sandbox
+                   │ VERCEL_TOKEN           │  ← sandbox auth
+                   │ VERCEL_TEAM_ID         │  ← sandbox auth
+                   │ VERCEL_PROJECT_ID      │  ← sandbox auth
                    │ VERCEL_AI_GATEWAY_KEY  │  ← cheap models
                    └────────────────────────┘
 ```
@@ -152,7 +154,7 @@ guess on bad input.**
       │      │  │      │   │      │  ...   │      │  │      │
       │ wt/  │  │ wt/  │   │ wt/  │        │ wt/  │  │ wt/  │
       └──────┘  └──────┘   └──────┘        └──────┘  └──────┘
-         OR with --worker=daytona:
+         OR with --worker=sandbox:
       ┌──────┐  ┌──────┐   ┌──────┐        ┌──────┐  ┌──────┐
       │ ☁ sb │  │ ☁ sb │   │ ☁ sb │        │ ☁ sb │  │ ☁ sb │
       │GLM-5 │  │GLM-5 │   │GLM-5 │        │GLM-5 │  │GLM-5 │
@@ -161,7 +163,7 @@ guess on bad input.**
 
 **Two modes:**
 - `--worker=local` — git worktrees on your machine, Claude Max does the work
-- `--worker=daytona` — cloud sandboxes running cheap models via Vercel AI Gateway
+- `--worker=sandbox` — Vercel Sandboxes running cheap models via Vercel AI Gateway
 
 **Model escalation ladder** (auto-retries on smoke failure):
 ```
@@ -321,7 +323,7 @@ time. Smoke catches that.
 ┌─────────┐        ┌─────────┐        ┌──────────┐
 │ WORKERS │        │ REVIEW  │        │ GITHUB   │
 │         │        │         │        │          │
-│ ☁ daytona│◄──────►│ codex   │        │ gh pr    │
+│ ☁ sandbox│◄──────►│ codex   │        │ gh pr    │
 │  or     │        │ specialists│      │ merge    │
 │ 💻 local │        └─────────┘        └────┬─────┘
 └────┬────┘                                 │
@@ -350,7 +352,7 @@ time. Smoke catches that.
 /linear-swarm:linear-swarm PLAYKIT-22
 
 # Cheap-tier cloud workers
-/linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=daytona
+/linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=sandbox
 
 # Dry run (stop before push)
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --dry-run

@@ -1,14 +1,14 @@
 ---
 name: linear-swarm
-description: Ship a whole Linear project in one session — fan out parallel agents across git worktrees or Daytona sandboxes, audit with Codex + specialist reviewers, run structural smoke, sequentially merge PRs, deploy, and verify against live prod. Gracefully delegates to Every's compound-engineering plugin when installed. Use when you have a set of independent, well-specified Linear tickets to execute and ship together.
-argument-hint: "<TEAM> <PROJECT_NAME> | <ISSUE-ID>  [--worker=local|daytona] [--model=<slug>] [--dry-run] [--skip-codex]"
+description: Ship a whole Linear project in one session — fan out parallel agents across git worktrees or Sandcastle-powered Vercel Sandboxes, audit with Codex + specialist reviewers, run structural smoke, sequentially merge PRs, deploy, and verify against live prod. Gracefully delegates to Every's compound-engineering plugin when installed. Use when you have a set of independent, well-specified Linear tickets to execute and ship together.
+argument-hint: "<TEAM> <PROJECT_NAME> | <ISSUE-ID>  [--worker=local|sandbox] [--model=<slug>] [--dry-run] [--skip-codex]"
 user-invocable: true
 allowed-tools: Agent, SendMessage, Bash, Read, Write, Edit, Grep, Glob, ToolSearch, Skill, TaskCreate, TaskUpdate, TaskList, mcp__linear__list_issues, mcp__linear__list_projects, mcp__linear__get_issue, mcp__linear__save_issue
 ---
 
 # Linear Swarm
 
-Execute a Linear project end-to-end in one session using the **parallel fan-out + external review + structural smoke + sequential ship + prod verify** pattern. This skill owns the orchestration — every heavy lifting step delegates to existing primitives (compound-engineering workflows when installed, worktree/Daytona workers, `codex:rescue`, `gh`, Linear MCP, etc.).
+Execute a Linear project end-to-end in one session using the **parallel fan-out + external review + structural smoke + sequential ship + prod verify** pattern. This skill owns the orchestration — every heavy lifting step delegates to existing primitives (compound-engineering workflows when installed, worktree/sandbox workers, `codex:rescue`, `gh`, Linear MCP, etc.).
 
 **Invariant:** every phase is a gate. Don't skip gates.
 
@@ -51,8 +51,9 @@ Fetches the parent issue + its subtasks. Each subtask = one agent. The parent de
 
 ## Flags
 
-- `--worker=local|daytona` — local worktrees (Claude Max) or Daytona sandboxes (cheap tier). Default: `local`
-- `--model=<slug>` — tier-1 model when `--worker=daytona`. Default: `zai/glm-5.1`. Fallbacks: `moonshotai/kimi-k2.5`, `anthropic/claude-haiku-4.5`, Claude Opus via Max
+- `--worker=local|sandbox` — local worktrees (Claude Max) or Vercel Sandboxes (cheap tier). Default: `local`
+- `--model=<slug>` — tier-1 model when `--worker=sandbox`. Default: `zai/glm-5.1`. Fallbacks: `moonshotai/kimi-k2.5`, `anthropic/claude-haiku-4.5`, Claude Opus via Max
+- `--worker=daytona` is accepted as a deprecated alias for `--worker=sandbox`
 - `--dry-run` — run Phases 1-6 and halt before push
 - `--skip-codex` — use only if Codex is unreachable
 
@@ -73,7 +74,7 @@ Phase 1 — Scoping ACME "Q2 Platform Work"
 Phase 2 — Writing test specifications
   ✓ ACME-101: 6 structural checks + 3 import smokes
 
-Phase 3 — Spinning up 3 workers (Daytona sandbox, GLM 5.1)
+Phase 3 — Spinning up 3 workers (Vercel Sandbox, GLM 5.1)
   ● ACME-101 working...
   ✓ ACME-101 committed — 2 files changed, all checks pass
 
@@ -90,7 +91,7 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
 2. **Print ✓/✗/⚠/● status bullets** as steps complete. One line per meaningful result. ✓ = done, ✗ = failed, ⚠ = warning, ● = in progress.
 
 3. **Every Bash tool call MUST have a `description:` parameter.** The description is what the user sees in the UI — not the command. Examples of GOOD descriptions:
-   - `description: "Spinning up Daytona worker for SEND-82"`
+   - `description: "Spinning up sandbox worker for SEND-82"`
    - `description: "Writing test spec for SEND-83"`
    - `description: "Pushing 3 branches to origin"`
    - `description: "Merging PR #127"`
@@ -99,10 +100,10 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
    Examples of BAD (never do this):
    - `description: "Run command"` — too vague
    - No description at all — user sees raw command
-   - `description: "daytona exec claude-sandbox -- git..."` — just repeating the command
+   - `description: "sandbox-worker --branch SEND-82..."` — just repeating the command
 
 4. **Use `bin/` commands, NEVER write Python scripts.** The plugin ships executables on PATH:
-   - `daytona-worker --repo R --branch B --brief F --commit-msg M` — full sandbox lifecycle
+   - `sandbox-worker --repo R --branch B --brief F --commit-msg M` — full sandbox lifecycle
    - `linear-comment --issue ID --body "message"` — post to Linear
    These are one-liners. Do NOT write wrapper scripts, do NOT use base64 encoding, do NOT bake API keys into generated code. All credentials come from env vars automatically.
 
@@ -118,8 +119,8 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
 
 7. **Suppress intermediate output.** When calling bin/ scripts, pipe to a log and surface only the summary:
    ```
-   Bash(command: "daytona-worker ... > /tmp/worker-SEND-82.log 2>&1 && tail -1 /tmp/worker-SEND-82.log",
-        description: "Running Daytona worker for SEND-82")
+   Bash(command: "sandbox-worker ... > /tmp/worker-SEND-82.log 2>&1 && tail -4 /tmp/worker-SEND-82.log",
+        description: "Running sandbox worker for SEND-82")
    ```
 
 8. **The golden rule:** if a tool call's `description` or visible output would confuse someone watching over the user's shoulder, rewrite it.
@@ -131,7 +132,7 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
    - Phase 7 complete: `"[pr] PR #<n> opened: <url>"`
    - Phase 8 complete: `"[done] Merged to main"`
    - Phase 9 complete: `"[deploy] Deployed + prod smoke passed"`
-   Daytona workers post their own mid-work comments via the injected `linear_comment()` helper. Non-fatal — never block a phase on a failed comment.
+   Sandbox workers post their own mid-work comments via the wrapper when `LINEAR_API_KEY` is available. Non-fatal — never block a phase on a failed comment.
 
 ---
 
@@ -229,7 +230,7 @@ Agent(
 )
 ```
 
-### Worker B — Daytona sandbox (cheap-tier)
+### Worker B — Sandcastle + Vercel Sandbox (cheap-tier)
 
 **Step 1:** Write the brief to a temp file. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/worker-brief.md` as the base — fill in the `{{VARIABLES}}` with the ticket data. Example:
 
@@ -241,10 +242,10 @@ cp ${CLAUDE_PLUGIN_ROOT}/templates/worker-brief.md /tmp/brief-SEND-82.md
 
 Or just Write() the brief directly — the template shows the expected format.
 
-**Step 2:** Call `daytona-worker` (one command, in PATH via plugin `bin/`):
+**Step 2:** Call `sandbox-worker` (one command, in PATH via plugin `bin/`):
 
 ```bash
-daytona-worker \
+sandbox-worker \
   --repo orchidautomation/sendlens \
   --branch brandon/send-82-elements \
   --brief /tmp/brief-SEND-82.md \
@@ -252,22 +253,22 @@ daytona-worker \
   --linear-issue SEND-82
 ```
 
-That's it. The script handles: wake sandbox, clone, branch, inject credentials, run Claude with the model, commit, push, post Linear comment. **All credentials come from env vars — never pass keys in arguments or generated code.**
+That's it. The script handles: runtime bootstrap, Vercel auth resolution, Sandcastle execution, local branch sync-back, deterministic commit creation when needed, and Linear comments. **All credentials come from env vars or plugin settings — never pass keys in arguments or generated code.**
 
-For parallel workers, run multiple `daytona-worker` calls as background Bash commands. Each gets its own clone dir inside the sandbox automatically.
+For parallel workers, run multiple `sandbox-worker` calls as background Bash commands. Each gets its own sandbox and local branch state automatically.
 
-**Step 3:** After push, mirror into local worktree for later phases:
+**Step 3:** Reuse the returned local worktree if the wrapper prints `WORKTREE:`. If it does not, create a local worktree for later phases:
 
 ```bash
-git fetch origin <branch>
-git worktree add .claude/worktrees/<ticket-id> -B <branch> FETCH_HEAD
+git worktree add .sandcastle/worktrees/<ticket-id> <branch>
 ```
 
 ### Available bin/ commands (all on PATH, all read creds from env)
 
 | Command | What it does |
 |---|---|
-| `daytona-worker --repo R --branch B --brief F --commit-msg M` | Full sandbox worker lifecycle |
+| `sandbox-worker --repo R --branch B --brief F --commit-msg M` | Full sandbox worker lifecycle |
+| `daytona-worker --repo R --branch B --brief F --commit-msg M` | Deprecated alias for `sandbox-worker` |
 | `linear-comment --issue ID --body "message"` | Post a comment to a Linear issue |
 
 ### Brief format (per agent)
@@ -298,7 +299,7 @@ You are implementing Linear parent task <ID>: <title>.
 Do NOT push. Do NOT open a PR. Stop after committing.
 ```
 
-Local worktree agents follow that verbatim. Daytona workers use the same brief, but the wrapper handles the push automatically so the branch can be mirrored locally for later phases.
+Local worktree agents follow that verbatim. Sandbox workers use the same brief, but the wrapper syncs results back onto a normal local branch and may preserve a local worktree for the later phases.
 
 ### Model escalation ladder (per-ticket, on failure of smoke in Phase 6)
 
@@ -361,11 +362,10 @@ Report new commit hash in ≤180 words."
 )
 ```
 
-- If the branch came from Daytona, work from the mirrored local branch instead:
+- If the branch came from a sandbox worker, work from the synced local branch instead:
 
 ```
-git fetch origin <branch>
-git worktree add .claude/worktrees/<ticket-id>-fix -B <branch> FETCH_HEAD
+git worktree add .sandcastle/worktrees/<ticket-id>-fix <branch>
 Agent(
   description: "<ticket-id> fix-up",
   subagent_type: "general-purpose",
@@ -376,9 +376,9 @@ Agent(
 ```
 
 **Rules:**
-- `SendMessage` is only for long-lived local worktree agents. Do NOT try to `SendMessage` a one-shot Daytona skill run.
-- Daytona branches must exist as local mirror worktrees before entering Phase 4, so every later phase has a normal branch checkout.
-- **Escalate model tier** only for repeated Phase 3 Daytona failures. Once a branch is mirrored locally, later fix-ups stay local unless you explicitly choose to restart Phase 3.
+- `SendMessage` is only for long-lived local worktree agents. Do NOT try to `SendMessage` a one-shot sandbox worker run.
+- Sandbox branches must exist as normal local branches before entering Phase 4, so every later phase has a standard branch checkout.
+- **Escalate model tier** only for repeated Phase 3 sandbox failures. Once a branch is synced locally, later fix-ups stay local unless you explicitly choose to restart Phase 3.
 - Re-run Phase 4 with `--resume` (not `--fresh`) so Codex continues the prior review thread with context.
 - Loop until all READY. Usually 1-2 rounds.
 
@@ -394,7 +394,7 @@ Skill(linear-swarm:smoke-verify)
 It:
 1. Scaffolds `scripts/verify_refactor.py` in the target repo if missing (from template)
 2. Captures a baseline from current `main`
-3. Copies script + baseline into each local worktree, including Daytona mirror worktrees
+3. Copies script + baseline into each local worktree, including sandbox-origin branches
 4. Runs `python3 scripts/verify_refactor.py --smoke` in parallel across every worktree
 5. Asserts: module imports cleanly, framework inventory matches baseline, decoupling holds, **live tool dispatch through real framework call path returns valid JSON** (not error-prefix strings)
 
@@ -414,7 +414,7 @@ gh pr create --base main --head <branch> \
   --body <summary + Linear link + test plan>
 ```
 
-For Daytona-origin branches, the first push already happened in Phase 3. Phase 7 simply syncs any local mirror fixes before opening the PR.
+Sandbox-origin branches remain local after Phase 3. Phase 7 is the first push before opening the PR.
 
 After all PRs open:
 - Print PR URL table
@@ -509,9 +509,8 @@ for br in $(git branch --list "<prefix>*"); do
   git branch -D "$br"
 done
 
-# Pull main, stop Daytona sandbox if used, snapshot if keeping
+# Pull main after cleanup
 git pull --ff-only origin main
-daytona stop <sandbox> 2>/dev/null || true
 
 # Move Linear issues to Done (only if Phase 9 passed)
 for id in <ticket_ids>; do
@@ -542,7 +541,7 @@ This is what makes the pattern truly compound: every run writes learnings the ne
 | Failure | Recovery |
 |---|---|
 | Agent never commits | `SendMessage` with "you haven't committed yet, run git add + commit now" |
-| Daytona worker exits non-zero | Stop immediately, surface sandbox stderr, fix the wrapper/input, then rerun Phase 3 |
+| Sandbox worker exits non-zero | Stop immediately, surface sandbox stderr, fix the wrapper/input, then rerun Phase 3 |
 | Codex unreachable | `--skip-codex` flag falls back to bundled reviewers only |
 | Structural smoke fails after fix-up | `SendMessage` the agent with the exact assertion that broke; escalate model tier if persistent |
 | Merge conflict cascade | Halt ladder, rebase + smoke + force-push, continue |

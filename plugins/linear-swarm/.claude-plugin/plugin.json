@@ -1,22 +1,40 @@
 {
   "name": "linear-swarm",
-  "description": "Ship a whole Linear project in one session by fanning out parallel worktree or Daytona-sandbox agents, auditing with Codex + specialist reviewers, running a structural smoke, sequentially merging PRs, deploying, and verifying against live production. Gracefully enhanced by Every's compound-engineering-plugin when both are installed.",
-  "version": "1.0.1",
+  "description": "Ship a whole Linear project in one session by fanning out parallel worktree or Sandcastle-powered Vercel Sandbox agents, auditing with Codex + specialist reviewers, running a structural smoke, sequentially merging PRs, deploying, and verifying against live production. Gracefully enhanced by Every's compound-engineering-plugin when both are installed.",
+  "version": "1.1.0",
   "author": { "name": "Orchid Automation" },
   "homepage": "https://github.com/orchid-automation/orchid-plugins",
   "repository": "https://github.com/orchid-automation/orchid-plugins",
   "license": "MIT",
-  "keywords": ["linear", "workflow", "orchestration", "parallel-agents", "worktrees", "daytona", "codex-review", "compound-engineering", "shipping"],
+  "keywords": ["linear", "workflow", "orchestration", "parallel-agents", "worktrees", "sandcastle", "vercel-sandbox", "codex-review", "compound-engineering", "shipping"],
   "userConfig": {
     "vercel_ai_gateway_key": {
-      "description": "Vercel AI Gateway API key (for cheap-tier Daytona workers). Get one at https://vercel.com/ai-gateway",
+      "type": "string",
+      "title": "Vercel AI Gateway Key",
+      "description": "Vercel AI Gateway API key for sandbox workers. Get one at https://vercel.com/ai-gateway",
       "sensitive": true
     },
-    "daytona_api_key": {
-      "description": "Daytona API key (for cloud sandbox workers). Get one at https://app.daytona.io",
+    "vercel_token": {
+      "type": "string",
+      "title": "Vercel Token",
+      "description": "Vercel access token for sandbox auth. Optional if VERCEL_OIDC_TOKEN is already available.",
       "sensitive": true
+    },
+    "vercel_team_id": {
+      "type": "string",
+      "title": "Vercel Team ID",
+      "description": "Vercel team ID used for sandbox auth when using VERCEL_TOKEN",
+      "sensitive": false
+    },
+    "vercel_project_id": {
+      "type": "string",
+      "title": "Vercel Project ID",
+      "description": "Vercel project ID used for sandbox auth when using VERCEL_TOKEN",
+      "sensitive": false
     },
     "linear_api_key": {
+      "type": "string",
+      "title": "Linear API Key",
       "description": "Linear API key (for posting progress comments). Get one at https://linear.app/settings/api",
       "sensitive": true
     }

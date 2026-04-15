@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Post a comment to a Linear issue via the GraphQL API.
 
-Works from anywhere — inside a Daytona sandbox, from a hook script,
+Works from anywhere — inside a Vercel Sandbox worker, from a hook script,
 or from the orchestrator as a fallback when the Linear MCP isn't available.
 
 Usage:

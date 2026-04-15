@@ -5,6 +5,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "LINEAR_SWARM_SOFT_FAIL=1 \"${CLAUDE_PLUGIN_ROOT}/scripts/ensure_runtime.sh\""
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/preflight.sh\""
           }
         ]
