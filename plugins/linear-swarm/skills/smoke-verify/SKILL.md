@@ -94,6 +94,6 @@ See `verify_refactor.py.template` in this directory for a Python starter that ha
 ## When it fails in weird ways
 
 - **"VERIFY PASSED" but PR still broken at deploy** — the smoke script didn't exercise the actual broken code path. Add more free tools to the dispatch list.
-- **"✗ VERIFY FAILED" on a branch that should be clean** — the baseline is stale. Re-capture baseline with `--baseline` from current main.
+- **"✗ VERIFY FAILED" on a branch that should be clean** — the baseline is stale. Re-capture baseline with `--baseline` from the swarm's recorded base ref.
 - **Smoke hangs** — a framework call is blocking. Add a timeout to the asyncio.run() wrapper in the template.
 - **Non-JSON return accepted as passing** — the template's smoke check is too lenient. Reject anything starting with `"Error"` or not parseable as JSON.
