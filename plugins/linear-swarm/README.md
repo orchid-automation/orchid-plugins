@@ -75,7 +75,10 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 # Issue mode (epic with subtasks)
 /linear-swarm:linear-swarm ENG-66
 /linear-swarm:linear-swarm PROJ-142 --worker=sandbox --model=zai/glm-5.1
+/linear-swarm:linear-swarm ENG-66 --worker=sandbox --dry-run
 ```
+
+> **`--dry-run` stops before worker fan-out.** No Sandcastle + Vercel Sandbox workers are spawned, no branches are created, and no PRs are opened. The command runs scope and test design only, writes shared specs to `/tmp/linear-swarm-tests`, and exits. Use it to preview what a full run would touch before committing resources.
 
 ## Flags
 
