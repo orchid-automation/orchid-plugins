@@ -135,7 +135,7 @@ guess on bad input.**
    │   - pytest case (code change)          │
    │   - checklist (docs/config/copy)       │
    │   - "manual-review" tag (ambiguous)    │
-   │ saves to docs/swarm/tests/<ID>.md      │
+   │ saves to /tmp/linear-swarm-tests/<ID>.md │
    └────────────────────────────────────────┘
 ```
 
@@ -354,7 +354,7 @@ time. Smoke catches that.
 # Cheap-tier cloud workers
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=sandbox
 
-# Dry run (stop before push)
+# Dry run (stop before worker fan-out)
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --dry-run
 ```
 

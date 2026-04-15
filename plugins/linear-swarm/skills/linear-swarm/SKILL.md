@@ -54,7 +54,7 @@ Fetches the parent issue + its subtasks. Each subtask = one agent. The parent de
 - `--worker=local|sandbox` — local worktrees (Claude Max) or Vercel Sandboxes (cheap tier). Default: `local`
 - `--model=<slug>` — tier-1 model when `--worker=sandbox`. Default: `zai/glm-5.1`. Fallbacks: `moonshotai/kimi-k2.5`, `anthropic/claude-haiku-4.5`, Claude Opus via Max
 - `--worker=daytona` is accepted as a deprecated alias for `--worker=sandbox`
-- `--dry-run` — run Phases 1-6 and halt before push
+- `--dry-run` — run Phases 1-2 only, write shared test specs to `/tmp/linear-swarm-tests`, and halt before any worker, branch, worktree, or push activity
 - `--skip-codex` — use only if Codex is unreachable
 
 ---
@@ -74,6 +74,8 @@ Phase 1 — Scoping ACME "Q2 Platform Work"
 Phase 2 — Writing test specifications
   ✓ ACME-101: 6 structural checks + 3 import smokes
 
+--dry-run: wrote shared test specs to /tmp/linear-swarm-tests and stopped before worker fan-out.
+
 Phase 3 — Spinning up 3 workers (Vercel Sandbox, GLM 5.1)
   ● ACME-101 working...
   ✓ ACME-101 committed — 2 files changed, all checks pass
@@ -81,7 +83,7 @@ Phase 3 — Spinning up 3 workers (Vercel Sandbox, GLM 5.1)
 Phase 4 — Reviewing (compound-engineering fleet + Codex)
   ✓ ACME-101: READY
 
---dry-run: stopping before push.
+--dry-run: stopping before worker fan-out.
 ```
 
 ### Rules
@@ -206,7 +208,12 @@ For each parent:
    - Pytest/jest case if the change is testable in code
    - Structured checklist (YAML frontmatter + bullets) for docs/config/copy changes — "file X exists", "file X contains Y", "file X does NOT contain Z"
    - Skip tag `"manual-review-required"` if neither applies; flagged for manual merge in Phase 9
-3. Store tests at `docs/swarm/tests/<ticket-id>.md` for reference by workers + reviewers.
+3. Store tests at `${TMPDIR:-/tmp}/linear-swarm-tests/<ticket-id>.md` for reference by workers + reviewers.
+
+If `--dry-run` is set:
+- stop immediately after Phase 2
+- print the generated spec paths and the recommended execution plan
+- do NOT create worktrees, branches, repo-local scratch files, sandbox jobs, or review tasks
 
 This transforms the worker's job from "figure out what to do" → "make these tests pass." Huge reliability gain for cheap-tier models.
 
@@ -286,7 +293,7 @@ You are implementing Linear parent task <ID>: <title>.
 <explicit file list derived from ticket + subtasks>
 
 ## Test specification (MUST pass before you commit)
-<paste from docs/swarm/tests/<ticket-id>.md>
+<paste from ${TMPDIR:-/tmp}/linear-swarm-tests/<ticket-id>.md>
 
 ## Instructions
 1. Read the files you need to modify
@@ -356,7 +363,7 @@ SendMessage(
   summary: "<ID> fix-up",
   message: "Codex review flagged: <exact finding with file:line>.
 Fix: <specific steps>.
-Re-run test spec: <from docs/swarm/tests/<ID>.md>.
+Re-run test spec: <from ${TMPDIR:-/tmp}/linear-swarm-tests/<ID>.md>.
 Commit with message: <type>: <summary> (<ID>).
 Report new commit hash in ≤180 words."
 )
@@ -400,7 +407,7 @@ It:
 
 Every worktree must emit `✓ VERIFY PASSED` before advancing. On failure: back to Phase 5 with the specific assertion that broke.
 
-**STOP HERE if `--dry-run`.**
+**`--dry-run` should never reach this phase.** If the user set `--dry-run`, stop after Phase 2 instead.
 
 ---
 

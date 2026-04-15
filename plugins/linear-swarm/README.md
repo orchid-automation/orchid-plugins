@@ -83,7 +83,7 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 |---|---|---|
 | `--worker=local\|sandbox` | `local` | Execute in local git worktrees (Claude Max) or Vercel Sandboxes (cheap tier) |
 | `--model=<slug>` | `zai/glm-5.1` | Tier-1 model when `--worker=sandbox` |
-| `--dry-run` | off | Run through plan + review + smoke, stop before push |
+| `--dry-run` | off | Run scope + test design only, write shared specs to `/tmp/linear-swarm-tests`, then stop before worker fan-out |
 | `--skip-codex` | off | Skip external Codex review (use only if Codex is unavailable) |
 
 `--worker=daytona` is still accepted as a deprecated alias for `--worker=sandbox` so older prompts do not break.

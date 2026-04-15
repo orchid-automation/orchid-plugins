@@ -43,7 +43,7 @@
 │    - pytest/jest case if code change                                   │
 │    - structured checklist if docs/config/copy                          │
 │    - "manual-review-required" tag if neither                           │
-│  Stored at docs/swarm/tests/<ticket-id>.md                             │
+│  Stored at /tmp/linear-swarm-tests/<ticket-id>.md                      │
 │                                                                        │
 │  Critical: worker's job becomes "make these tests pass" instead of    │
 │  "figure out what to do". Big reliability gain for cheap-tier models.  │
@@ -134,7 +134,7 @@
 │                                                                        │
 │  Rejects error-prefix strings and non-JSON returns strictly.           │
 │                                                                        │
-│  STOP HERE if --dry-run.                                               │
+│  --dry-run should have already stopped after test design.              │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼
