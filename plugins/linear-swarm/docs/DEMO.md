@@ -449,9 +449,6 @@ targets, review context, and whether deploy/prod-verify phases run.
 /linear-swarm:linear-swarm PLUXX-102
 ```
 
-No `--base` flag is needed — `linear-swarm` detects the current branch and
-records it as the swarm base at fan-out time.
-
 ### What changes vs. a default-branch run
 
 1. **Review and PR base follow the swarm base branch.** When the orchestrator
@@ -495,15 +492,6 @@ records it as the swarm base at fan-out time.
     When you later merge feature/auth-v2 into main, a separate
     deploy/prod-verify cycle runs at that time.
 ```
-
-### Why this matters
-
-- **Stacked PRs work naturally.** Each layer targets the branch below it,
-  not `main` — so reviews see only the delta for that layer.
-- **No accidental deploys.** The orchestrator won't try to deploy from a
-  feature branch, avoiding broken partial releases.
-- **Merge order still applies.** Even on a non-default branch, the
-  zero-overlap-first, refactor-last merge ladder is used to avoid conflicts.
 
 ---
 
