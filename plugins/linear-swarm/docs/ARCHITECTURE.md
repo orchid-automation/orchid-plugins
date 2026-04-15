@@ -237,6 +237,8 @@
                               └─────────┘
 ```
 
+**Validation tip:** Before running the swarm on real multi-repo epics, test with a parent issue whose subtasks all target the current repo. This exercises the full phase pipeline without cross-repo coordination noise, making orchestrator bugs easy to spot.
+
 ## Support systems (running alongside the phases)
 
 ```
