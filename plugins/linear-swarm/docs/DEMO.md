@@ -361,6 +361,75 @@ time. Smoke catches that.
 
 ---
 
+## Walkthrough: repo-local dry run
+
+A dry run is the fastest way to validate that `linear-swarm` can read your
+Linear issue, audit its tickets, and produce a merge plan — all without
+spawning workers, pushing branches, or touching production.
+
+### What `--dry-run` does
+
+`--dry-run` executes **Phases 1–2** (SCOPE and TEST DESIGN) and **skips
+Phases 3–10** (FAN-OUT through PROD VERIFY). No agents are spawned, no
+branches are created, no PRs are opened, and no deployments happen. You get
+the scope audit and the test design artifacts so you can inspect quality
+before committing to a full run.
+
+### Command shape
+
+```bash
+# Issue mode — single parent issue with subtasks
+/linear-swarm:linear-swarm <ISSUE-ID> --dry-run
+
+# Example
+/linear-swarm:linear-swarm PLAYKIT-22 --dry-run
+```
+
+### Step-by-step
+
+```
+1.  Point at a Linear issue that has subtasks already defined.
+    The issue must live in a project your LINEAR_API_KEY can read.
+
+2.  Run the command:
+      /linear-swarm:linear-swarm PLAYKIT-22 --dry-run
+
+3.  What you'll see:
+
+    Phase 1 — SCOPE
+      • linear-swarm reads every subtask on the parent issue
+      • audits each ticket: STRONG / OK / WEAK / UNFIT
+      • prints the file-overlap matrix and proposed merge order
+      • asks for your confirmation  ← you review and say "go" or "stop"
+
+    Phase 2 — TEST DESIGN
+      • orchestrator reads the repo files each ticket touches
+      • writes a test spec per ticket to /tmp/linear-swarm-tests/<ID>.md
+      • prints a summary table
+
+    ── dry run ends here ──
+    Phases 3–10 are skipped. No workers, no branches, no PRs, no deploys.
+
+4.  Inspect the output:
+      • Are all tickets STRONG or OK?  Fix WEAK/UNFIT tickets before a real run.
+      • Does the merge order look right?  The biggest refactor should be last.
+      • Do the test specs cover the acceptance criteria?
+
+5.  When you're satisfied, remove --dry-run and run for real:
+      /linear-swarm:linear-swarm PLAYKIT-22 --worker=sandbox
+```
+
+### Why start with a dry run?
+
+- **Catch bad input early.** Weak tickets (missing file paths, no acceptance
+  criteria) waste worker time. Fix them before paying for sandbox compute.
+- **Validate the merge plan.** A wrong merge order causes conflicts that the
+  merge ladder can't untangle. Cheaper to reorder now than to re-run later.
+- **No side effects.** Nothing is pushed, no Linear states change, no
+  Vercel Sandboxes are created. Safe to run repeatedly.
+
+---
+
 ## Live demo example (2026-04-12 run)
 
 ```
