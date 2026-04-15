@@ -95,7 +95,7 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 
 When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the result back onto a local git branch, and leaves the rest of the workflow uniform. Review, fix-up, smoke, PR, and merge phases all operate on normal local branches and worktrees.
 
-`linear-swarm` records a **swarm base branch + base SHA** at startup. Review, smoke, PR base, rebases, and cleanup all key off that recorded base instead of assuming `main`. That keeps feature-branch test runs scoped correctly.
+`linear-swarm` records a **swarm base branch + base SHA** at startup. Review, PR, smoke, merge, and cleanup all key off that recorded base instead of assuming `main`, so stacked runs stay scoped correctly.
 
 ## The 10 phases
 
