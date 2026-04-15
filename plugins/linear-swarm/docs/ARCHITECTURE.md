@@ -239,6 +239,8 @@
                               └─────────┘
 ```
 
+**Note:** Phases 2 (review), 4 (smoke), 5 (PR), and 6 (merge) operate relative to the recorded swarm base branch and base SHA — not the current HEAD of the deploy branch. This avoids false scope-creep findings when runs execute on stacked branches.
+
 **Validation tip:** Before running the swarm on real multi-repo epics, test with a parent issue whose subtasks all target the current repo. This exercises the full phase pipeline without cross-repo coordination noise, making orchestrator bugs easy to spot.
 
 ## Support systems (running alongside the phases)
