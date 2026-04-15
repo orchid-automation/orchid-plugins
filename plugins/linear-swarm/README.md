@@ -22,6 +22,12 @@ claude --plugin-dir ./plugins/linear-swarm
 
 `validate_swarm.sh` is the checked-in hardening harness. It runs manifest/runtime syntax checks, exercises the sandbox runtime bootstrap, and can replay the exact nested `claude --plugin-dir ./plugins/linear-swarm -p "/linear-swarm:linear-swarm ..."` path that Codex used to test the plugin from outside Claude Code.
 
+> **Operator note — `validate_swarm.sh` modes**
+>
+> - **Static validation** (`validate_swarm.sh` without `--target`): runs manifest checks, syntax linting for shell/Python/Node helpers, and sandbox runtime bootstrap. Use after any code change to catch packaging or syntax regressions — no Claude credentials needed.
+> - **Nested replay** (`validate_swarm.sh --target '<args>'`): does everything static validation does, then replays the full nested `claude --plugin-dir` invocation with the given arguments. Requires `ANTHROPIC_API_KEY` or a logged-in Claude session. Use to verify end-to-end behavior before shipping.
+> - A successful `--dry-run` (e.g., `--target 'PLUXX-96 --dry-run'`) should stop after scope discovery (Phase 1) and test design (Phase 2), write shared specs to `/tmp/linear-swarm-tests`, and exit without spawning workers.
+
 ## Required environment
 
 Before running `/linear-swarm:linear-swarm`, set these:
