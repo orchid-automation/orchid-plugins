@@ -1,7 +1,7 @@
 ---
 name: linear-swarm
 description: Ship a whole Linear project in one session — fan out parallel agents across git worktrees or Sandcastle-powered Vercel Sandboxes, audit with Codex + specialist reviewers, run structural smoke, sequentially merge PRs, deploy, and verify against live prod. Gracefully delegates to Every's compound-engineering plugin when installed. Uses the bundled Linear CLI for unattended issue/project reads and workflow updates.
-argument-hint: "<TEAM> <PROJECT_NAME> | <ISSUE-ID>  [--worker=local|sandbox] [--model=<slug>] [--dry-run] [--skip-codex]"
+argument-hint: "<TEAM> <PROJECT_NAME> | <ISSUE-ID>  [--worker=local|sandbox] [--model=<slug>] [--dry-run] [--skip-codex] [--manual-confirm]"
 user-invocable: true
 allowed-tools: Agent, SendMessage, Bash, Read, Write, Edit, Grep, Glob, Skill, TaskCreate, TaskUpdate, TaskList
 ---
@@ -55,9 +55,18 @@ Fetches the parent issue + its subtasks. Each subtask = one agent. The parent de
 - `--model=<slug>` — tier-1 model when `--worker=sandbox`. Default: `zai/glm-5.1`. Fallbacks: `moonshotai/kimi-k2.5`, `anthropic/claude-haiku-4.5`, Claude Opus via Max
 - `--worker=daytona` is accepted as a deprecated alias for `--worker=sandbox`
 - `--dry-run` — run Phases 1-2 only, write shared test specs to `/tmp/linear-swarm-tests`, and halt before any worker, branch, worktree, or push activity
-- `--skip-codex` — use only if Codex is unreachable
+- `--skip-codex` — skip the Codex meta-review and use CE or bundled reviewers only
+- `--manual-confirm` — force an explicit confirmation pause even when the scope audit is clean
 
 ---
+
+## Automation Rules
+
+Treat `/linear-swarm` as an automation-first workflow.
+
+- If the user explicitly invoked `/linear-swarm` and the Phase 1 audit is `STRONG` or `OK` with no blocking overlap, that invocation counts as approval. Print the plan, mark it auto-approved, and continue.
+- Only stop for confirmation when the user passed `--manual-confirm` or the audit found `WEAK` / `UNFIT` tickets, missing file paths, missing acceptance criteria, or blocking overlap that makes the merge plan unsafe.
+- Any rejected, interrupted, or denied tool call is a hard phase failure. Report the phase, the exact tool/action that failed, the stderr or rejection text, and stop. Never sit idle waiting for a follow-up tool approval in unattended mode.
 
 ## Presentation Rules (CRITICAL — follow before executing ANY phase)
 
@@ -197,7 +206,10 @@ If the first arg matches `[A-Z]+-[0-9]+` (e.g., `PROJ-66`), this is **issue mode
    - Recommended merge order
    - Worker mode + model
    - Swarm base branch + base SHA
-8. **USER CONFIRMATION GATE.** Wait for `go` / `yes` / `ship it`. Weak tickets should be fixed by the user via `/linear-doc` before proceeding. Do NOT auto-fix tickets.
+8. **Risk gate, not a default pause.**
+   - If every work item is `STRONG` or `OK` and overlap is merge-safe, print `✓ Scope audit clean — auto-approved` and continue immediately.
+   - If the user passed `--manual-confirm`, print the plan and wait for `go` / `yes` / `ship it`.
+   - If any work item is `WEAK` / `UNFIT` or overlap is blocking, stop with a remediation summary. Weak tickets should be fixed externally via `/linear-doc` before proceeding. Do NOT auto-fix tickets.
 
 ### Capture swarm base (both modes, before Phase 2)
 
@@ -295,6 +307,7 @@ git worktree add .sandcastle/worktrees/<ticket-id> <branch>
 | `sandbox-worker --repo R --branch B --brief F --commit-msg M` | Full sandbox worker lifecycle |
 | `daytona-worker --repo R --branch B --brief F --commit-msg M` | Deprecated alias for `sandbox-worker` |
 | `linear-comment --issue ID --body "message"` | Post a comment to a Linear issue |
+| `swarm-phase7 --plan P` | Push branches + open PRs sequentially from one manifest |
 
 ### Brief format (per agent)
 
@@ -357,13 +370,18 @@ Agent(subagent_type: "linear-swarm:security-reviewer", ...)
 Agent(subagent_type: "linear-swarm:simplicity-reviewer", ...)
 ```
 
-### Meta-synthesis — always runs
-After the review fleet (either CE or bundled):
+### Meta-synthesis — default path, skipped when requested
+After the review fleet (either CE or bundled), unless `--skip-codex` is set:
 ```
 Skill(codex:rescue) with: "--fresh\n\nReview all branches against <SWARM_BASE_BRANCH> / <SWARM_BASE_SHA> + the review findings above..."
 ```
 
 **CRITICAL: always prefix the codex prompt with `--fresh` on first call, `--resume` on every subsequent call.** Otherwise `codex:rescue` fires `AskUserQuestion` and halts automation.
+
+If `--skip-codex` is set:
+- skip the meta-synthesis call entirely
+- synthesize the bundled or CE reviewer findings locally in this session
+- do not mention Codex as a pending dependency
 
 **Prompt content for every reviewer:**
 - Include `SWARM_BASE_BRANCH` and `SWARM_BASE_SHA`
@@ -437,19 +455,31 @@ Every worktree must emit `✓ VERIFY PASSED` before advancing. On failure: back 
 
 ## Phase 7 — Push + PR
 
-Parallel, one bash call per branch:
+Use a single bundled helper so unattended runs do not emit parallel `gh pr create` tool calls:
+
+1. Write a JSON manifest at `${TMPDIR:-/tmp}/linear-swarm-phase7.json`
+```json
+{
+  "base": "<SWARM_BASE_BRANCH>",
+  "items": [
+    {
+      "issue": "<ID>",
+      "branch": "<branch>",
+      "title": "<conventional commit>",
+      "body_file": "/tmp/<ID>-pr.md"
+    }
+  ]
+}
 ```
-git push -u origin <branch>
-gh pr create --base <SWARM_BASE_BRANCH> --head <branch> \
-  --title "<conventional commit>" \
-  --body <summary + Linear link + test plan>
+2. Call:
+```bash
+swarm-phase7 --plan "${TMPDIR:-/tmp}/linear-swarm-phase7.json"
 ```
 
-Sandbox-origin branches remain local after Phase 3. Phase 7 is the first push before opening the PR.
+`swarm-phase7` pushes every branch, opens or reuses the PR sequentially, moves the Linear issue to `In Review` when `LINEAR_API_KEY` is available, and posts a `[pr]` comment with the URL. This phase must run as one deterministic Bash action in unattended mode.
 
-After all PRs open:
-- Print PR URL table
-- Move each Linear issue `Todo|Backlog → In Review` via `linear-issue set-state --id "$id" --state "In Review"`
+After `swarm-phase7` completes:
+- Print the PR URL table from its output
 - Check `gh pr view <n> --json mergeable` for every PR; flag `CONFLICTING` immediately for pre-emptive rebase
 
 ---
@@ -577,6 +607,7 @@ This is what makes the pattern truly compound: every run writes learnings the ne
 | Sandbox worker exits non-zero | Stop immediately, surface sandbox stderr, fix the wrapper/input, then rerun Phase 3 |
 | Codex unreachable | `--skip-codex` flag falls back to bundled reviewers only |
 | Structural smoke fails after fix-up | `SendMessage` the agent with the exact assertion that broke; escalate model tier if persistent |
+| Tool use rejected / interrupted | Stop the phase immediately, print the exact rejected action, and rerun from that phase with a single deterministic helper instead of waiting |
 | Merge conflict cascade | Halt ladder, rebase + smoke + force-push, continue |
 | Deploy stuck | Check platform logs (`railway logs`, `vercel logs`), investigate before forcing |
 | Prod smoke fails (ops config) | Fix env/secret/flag, redeploy, re-smoke. DO NOT move Linear to Done |
@@ -596,6 +627,7 @@ This is what makes the pattern truly compound: every run writes learnings the ne
 6. **Don't move Linear to Done until Phase 9 passes.** "In Review" is the holding state.
 7. **`codex:rescue` ALWAYS needs `--fresh` or `--resume`.** Without a flag, it fires `AskUserQuestion` and halts.
 8. **One agent per parent task, subtasks are internal.** Never spawn one agent per subtask — subtasks share files, so parallelism at that level creates conflicts.
+9. **Approval-sensitive GitHub operations must be serialized.** Use `swarm-phase7` for push + PR creation instead of parallel `gh pr create` calls.
 
 ---
 

@@ -8,6 +8,7 @@
                            [--worker=local|sandbox]
                            [--model=<slug>]
                            [--dry-run] [--skip-codex]
+                           [--manual-confirm]
                                        │
                                        ▼
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -30,10 +31,11 @@
 │  File-overlap matrix → recommended merge order                         │
 │  Record swarm base branch + base SHA from the current checkout         │
 │                                                                        │
-│  ┌─────── USER CONFIRMATION GATE ───────┐                              │
-│  │ Weak tickets must be fixed externally │                              │
-│  │ via /linear-doc before proceeding     │                              │
-│  └───────────────────────────────────────┘                              │
+│  ┌──────────── RISK GATE ──────────────┐                               │
+│  │ Clean scope auto-continues          │                               │
+│  │ --manual-confirm forces a pause     │                               │
+│  │ Weak/blocking scope stops the run   │                               │
+│  └─────────────────────────────────────┘                               │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼
@@ -88,7 +90,7 @@
 │    Agent(subagent_type="linear-swarm:security-reviewer")               │
 │    Agent(subagent_type="linear-swarm:simplicity-reviewer")             │
 │                                                                        │
-│  THEN (always):                                                        │
+│  THEN (unless --skip-codex):                                           │
 │    Skill(codex:rescue) with "--fresh\n\n<review prompt>"               │
 │    ^^^ META-SYNTHESIS across all branches                              │
 │                                                                        │
@@ -142,11 +144,12 @@
 ┌───────────────────────────────────────────────────────────────────────┐
 │  PHASE 5 — PUSH + PR                                                   │
 │  ─────────────────────────────────────────────────────────────────    │
-│  Parallel, per branch:                                                 │
-│    git push -u origin <branch>    # first push for sandbox branches    │
-│    gh pr create --base <swarm-base-branch> --head <branch>             │
+│  Single deterministic batch helper:                                    │
+│    swarm-phase7 --plan /tmp/linear-swarm-phase7.json                   │
 │                                                                        │
-│  Move each Linear issue: Todo/Backlog → In Review                      │
+│  Pushes branches, opens or reuses PRs sequentially, and moves          │
+│  Linear issues to In Review without parallel approval-sensitive        │
+│  tool calls.                                                           │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼

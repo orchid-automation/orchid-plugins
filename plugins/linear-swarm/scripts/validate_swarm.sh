@@ -85,6 +85,7 @@ run_step "Validate plugin manifest" claude plugin validate "$PLUGIN_ROOT"
 run_step "Check shell wrapper syntax" bash -n \
   "$PLUGIN_ROOT/bin/daytona-worker" \
   "$PLUGIN_ROOT/bin/sandbox-worker" \
+  "$PLUGIN_ROOT/bin/swarm-phase7" \
   "$PLUGIN_ROOT/scripts/ensure_runtime.sh" \
   "$PLUGIN_ROOT/scripts/preflight.sh" \
   "$PLUGIN_ROOT/scripts/linear_swarm_gate.sh"
@@ -110,7 +111,9 @@ if [ -n "$TARGET" ]; then
 
   timestamp="$(date +%Y%m%d%H%M%S)"
   nested_log="${LOG_DIR}/nested-${timestamp}.log"
-  prompt="/linear-swarm:linear-swarm ${TARGET}"
+  prompt="/linear-swarm:linear-swarm ${TARGET}
+
+Treat this as an unattended validation run. Auto-continue on a clean scope audit. If any tool use is rejected or interrupted, stop immediately and report the phase plus the exact action that failed."
 
   printf '==> Replay nested Claude session\n'
   printf '    prompt: %s\n' "$prompt"
