@@ -13,7 +13,7 @@ The key split is:
 
 - Codex does the orchestration.
 - Sandbox workers do the coding.
-- The default coding lane is still `zai/glm-5.1` in Vercel Sandbox.
+- The default coding lane is `zai/glm-5.1` in Vercel Sandbox via `opencode`.
 
 ## When to use this skill
 
@@ -25,14 +25,20 @@ Use this skill when the user wants any of:
 
 ## Current implementation boundary
 
-This plugin currently reuses the execution helpers from the checked-in Claude plugin:
+Start with the executable entrypoint:
 
-- [`plugins/linear-swarm/bin/linear-issue`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/linear-swarm/bin/linear-issue)
-- [`plugins/linear-swarm/bin/linear-comment`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/linear-swarm/bin/linear-comment)
-- [`plugins/linear-swarm/bin/sandbox-worker`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/linear-swarm/bin/sandbox-worker)
-- [`plugins/linear-swarm/bin/swarm-phase7`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/linear-swarm/bin/swarm-phase7)
+```bash
+plugins/linear-swarm-codex/bin/swarm-codex --issue TEAM-123 --dry-run
+```
 
-That means the control plane is now Codex-native, while the worker runtime is shared.
+This plugin currently reuses the shared execution helpers from:
+
+- [`plugins/_shared/linear-swarm/bin/linear-issue`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/_shared/linear-swarm/bin/linear-issue)
+- [`plugins/_shared/linear-swarm/bin/linear-comment`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/_shared/linear-swarm/bin/linear-comment)
+- [`plugins/_shared/linear-swarm/bin/sandbox-worker`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/_shared/linear-swarm/bin/sandbox-worker)
+- [`plugins/_shared/linear-swarm/bin/swarm-phase7`](/Users/brandonguerrero/Documents/Orchid Automation/Orchid Labs/orchid-plugins/plugins/_shared/linear-swarm/bin/swarm-phase7)
+
+That means the control plane is Codex-native, while the worker runtime is shared.
 
 ## Required workflow
 
@@ -40,8 +46,9 @@ That means the control plane is now Codex-native, while the worker runtime is sh
 
 Prefer the installed Linear tools when available. If tool access is missing or the user wants repo-local reproducibility, fall back to:
 
-- `plugins/linear-swarm/bin/linear-issue project-parents ...`
-- `plugins/linear-swarm/bin/linear-issue children ...`
+- `plugins/linear-swarm-codex/bin/swarm-codex --issue ...`
+- `plugins/_shared/linear-swarm/bin/linear-issue project-parents ...`
+- `plugins/_shared/linear-swarm/bin/linear-issue children ...`
 
 Output from this step:
 
@@ -65,11 +72,12 @@ The spec must be one of:
 Use the shared sandbox worker for implementation:
 
 ```bash
-plugins/linear-swarm/bin/sandbox-worker \
+plugins/_shared/linear-swarm/bin/sandbox-worker \
   --branch <branch> \
   --brief /tmp/brief-<ticket>.md \
   --commit-msg "<commit message>" \
   --model zai/glm-5.1 \
+  --agent-provider opencode \
   --hitl on-error \
   --linear-issue <ticket-id>
 ```
@@ -77,6 +85,7 @@ plugins/linear-swarm/bin/sandbox-worker \
 Rules:
 
 - Default worker model is `zai/glm-5.1`.
+- Default worker agent provider is `opencode`.
 - Use `--hitl on-error` when the run should surface a manual recovery path instead of failing silently.
 - Treat the sandbox worker as an implementation engine, not the orchestration layer.
 
@@ -97,7 +106,7 @@ If there are actionable issues, route fix-up back onto the same branch before PR
 
 Run the structural smoke path from the shared implementation, then batch PR creation through:
 
-- `plugins/linear-swarm/bin/swarm-phase7`
+- `plugins/_shared/linear-swarm/bin/swarm-phase7`
 
 Never emit multiple independent PR-creation actions when a single manifest-driven batch will do.
 
@@ -120,15 +129,16 @@ Codex
   +--> sandbox-worker
          -> Sandcastle
          -> Vercel Sandbox
+         -> opencode
          -> GLM 5.1 coding lane
 ```
 
 ## Important constraint
 
-This plugin removes Claude Code from the orchestration layer. It does not yet remove all Claude-derived runtime dependencies from the worker lane.
+This plugin removes Claude Code from the orchestration layer. The default worker lane is no longer Claude-derived, but `claude-code` remains available as a fallback provider.
 
 Inference:
 
-- today: Codex-native control plane, shared worker runtime
-- next: shared worker runtime becomes provider-pluggable
-- later: the cloud coding lane can move fully off Claude tooling if desired
+- today: Codex-native control plane, shared worker runtime, `opencode` default
+- next: Codex should own more of the later review and merge phases directly
+- later: add more proven gateway-compatible worker providers if they outperform `opencode`

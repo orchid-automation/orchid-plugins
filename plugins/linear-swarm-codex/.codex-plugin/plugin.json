@@ -1,6 +1,6 @@
 {
   "name": "linear-swarm-codex",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Codex-native control plane for Linear Swarm. Codex handles Linear scope, orchestration, review, and merge planning while cheap-tier cloud workers implement code in Vercel Sandbox.",
   "author": {
     "name": "Orchid Automation",

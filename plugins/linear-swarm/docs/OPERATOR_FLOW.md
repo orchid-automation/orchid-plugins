@@ -67,7 +67,7 @@ Phase 3: execution
            -> runtime/sandbox_worker.mjs
            -> Sandcastle
            -> Vercel Sandbox
-           -> Claude Code inside sandbox
+           -> opencode by default (claude-code fallback)
            -> sync result back to local branch/worktree
            -> optional `swarm-hitl` recovery on the same branch when `--hitl=on-error`
   |

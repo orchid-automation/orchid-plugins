@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# swarm-codex — Codex-native entrypoint for preparing and optionally running a Linear swarm
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+exec python3 "${PLUGIN_ROOT}/scripts/swarm_codex.py" "$@"

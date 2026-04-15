@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# swarm-phase7 — push branches + open PRs sequentially for unattended linear-swarm runs
+
+set -euo pipefail
+
+for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
+  [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
+done
+
+usage() {
+  cat <<'EOF'
+Usage:
+  swarm-phase7 --plan /path/to/phase7.json
+
+Plan format:
+  {
+    "base": "main",
+    "items": [
+      {
+        "issue": "TEAM-123",
+        "branch": "feature/branch",
+        "title": "feat: example (TEAM-123)",
+        "body_file": "/tmp/TEAM-123-pr.md"
+      }
+    ]
+  }
+EOF
+}
+
+PLAN=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --plan)
+      [ $# -ge 2 ] || { printf 'Error: --plan requires a value\n' >&2; exit 1; }
+      PLAN="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Error: unknown argument: %s\n' "$1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+[ -n "$PLAN" ] || { usage >&2; exit 1; }
+[ -f "$PLAN" ] || { printf 'Error: plan not found: %s\n' "$PLAN" >&2; exit 1; }
+
+command -v git >/dev/null 2>&1 || { printf 'Error: git not found\n' >&2; exit 1; }
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh not found\n' >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { printf 'Error: python3 not found\n' >&2; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LINEAR_ISSUE="${SCRIPT_DIR}/linear-issue"
+LINEAR_COMMENT="${SCRIPT_DIR}/linear-comment"
+
+python3 - "$PLAN" <<'PY' | while IFS=$'\t' read -r base issue branch title body_file; do
+import json
+import sys
+from pathlib import Path
+
+plan_path = Path(sys.argv[1])
+payload = json.loads(plan_path.read_text())
+base = payload.get("base")
+if not base:
+    raise SystemExit("Plan missing required key: base")
+
+for index, item in enumerate(payload.get("items", []), start=1):
+    for key in ("branch", "title", "body_file"):
+        if not item.get(key):
+            raise SystemExit(f"Plan item #{index} missing required key: {key}")
+    print("\t".join([
+        str(base),
+        str(item.get("issue", "")),
+        str(item["branch"]),
+        str(item["title"]).replace("\t", " ").replace("\n", " "),
+        str(item["body_file"]),
+    ]))
+PY
+  [ -f "$body_file" ] || { printf 'Error: body file not found for %s: %s\n' "$branch" "$body_file" >&2; exit 1; }
+
+  git push -u origin "$branch" >/dev/null
+
+  pr_url="$(gh pr view --head "$branch" --json url -q .url 2>/dev/null || true)"
+  if [ -z "$pr_url" ]; then
+    pr_url="$(gh pr create --base "$base" --head "$branch" --title "$title" --body-file "$body_file")"
+  fi
+
+  if [ -n "${issue:-}" ] && [ -n "${LINEAR_API_KEY:-}" ]; then
+    if [ -x "$LINEAR_ISSUE" ]; then
+      "$LINEAR_ISSUE" set-state --id "$issue" --state "In Review" >/dev/null 2>&1 || true
+    fi
+    if [ -x "$LINEAR_COMMENT" ]; then
+      "$LINEAR_COMMENT" --issue "$issue" --body "[pr] PR opened: $pr_url" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  printf 'PR\t%s\t%s\t%s\n' "${issue:-}" "$branch" "$pr_url"
+done

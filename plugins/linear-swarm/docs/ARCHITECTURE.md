@@ -273,7 +273,7 @@
 │ verify_refactor.py         │  │ sandbox_worker.mjs         │
 │ ──────────────────         │  │ ──────────────────         │
 │ Lives in scripts/ of the   │  │ Sandcastle wrapper for     │
-│ target repo. Scaffolded    │  │ headless Claude Code       │
+│ target repo. Scaffolded    │  │ shared sandbox workers     │
 │ from template on first     │  │ inside Vercel Sandbox via  │
 │ run if missing.            │  │ Vercel AI Gateway.         │
 │ Customized per framework   │  │                            │
@@ -283,6 +283,8 @@
 │  - dispatch_tool()         │  │ creation on local branches.│
 │  - SMOKE_TOOLS list        │  │                            │
 │                            │  │ Must exit non-zero on      │
+│                            │  │ Defaults to opencode with  │
+│                            │  │ claude-code as fallback.   │
 │                            │  │ worker/runtime/commit      │
 │                            │  │ errors. Successful runs    │
 │                            │  │ leave later phases on      │
