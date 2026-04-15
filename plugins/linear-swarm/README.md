@@ -77,7 +77,10 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 # Issue mode (epic with subtasks)
 /linear-swarm:linear-swarm ENG-66
 /linear-swarm:linear-swarm PROJ-142 --worker=sandbox --model=zai/glm-5.1
+/linear-swarm:linear-swarm TEAM-404 --worker=sandbox --dry-run
 ```
+
+> **`--dry-run` stops before worker fan-out.** It runs scope discovery (Phase 1) and test design (Phase 2), writes shared specs to `/tmp/linear-swarm-tests`, and then exits — no agents are spawned in worktrees or Vercel Sandboxes.
 
 ## Flags
 
