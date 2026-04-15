@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Post a comment to a Linear issue via the GraphQL API.
 
-Works from anywhere — inside a Daytona sandbox, from a hook script,
-or from the orchestrator as a fallback when the Linear MCP isn't available.
+Works from anywhere — inside a Vercel Sandbox worker, from a hook script,
+or from the orchestrator when it needs an unattended Linear comment path.
 
 Usage:
     python3 linear_comment.py --issue PROJ-42 --body "✓ Worker completed" --key $LINEAR_API_KEY
@@ -18,88 +18,39 @@ Zero external dependencies — stdlib only.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
-import urllib.request
-import urllib.error
 
-LINEAR_API = "https://api.linear.app/graphql"
+from linear_api import LinearError, api_key, graphql_request, resolve_issue
 
 
 def post_comment(issue_id: str, body: str, api_key: str) -> bool:
     """Post a comment to a Linear issue. Returns True on success."""
-    # Escape for GraphQL string
-    escaped_body = body.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-
-    query = {
-        "query": f"""
-            mutation {{
-                commentCreate(input: {{
-                    issueId: "{issue_id}"
-                    body: "{escaped_body}"
-                }}) {{
-                    success
-                    comment {{ id }}
-                }}
-            }}
-        """
-    }
-
-    req = urllib.request.Request(
-        LINEAR_API,
-        data=json.dumps(query).encode("utf-8"),
-        headers={
-            "Authorization": api_key,
-            "Content-Type": "application/json",
-        },
-    )
-
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            result = json.loads(resp.read().decode())
-            success = result.get("data", {}).get("commentCreate", {}).get("success", False)
-            if not success:
-                errors = result.get("errors", [])
-                if errors:
-                    sys.stderr.write(f"Linear API error: {errors[0].get('message', 'unknown')}\n")
-            return success
-    except urllib.error.URLError as e:
-        sys.stderr.write(f"Linear API unreachable: {e}\n")
-        return False
-    except Exception as e:
-        sys.stderr.write(f"Linear comment failed: {e}\n")
+        data = graphql_request(
+            """
+            mutation($issueId: String!, $body: String!) {
+              commentCreate(input: { issueId: $issueId, body: $body }) {
+                success
+                comment { id }
+              }
+            }
+            """,
+            api_key,
+            {"issueId": issue_id, "body": body},
+        )
+        return bool(data.get("commentCreate", {}).get("success", False))
+    except LinearError as exc:
+        sys.stderr.write(f"{exc}\n")
         return False
 
 
 def resolve_issue_id(identifier: str, api_key: str) -> str | None:
     """Resolve a human identifier (e.g., PROJ-42) to a Linear UUID."""
-    query = {
-        "query": f"""
-            query {{
-                issueSearch(query: "{identifier}", first: 1) {{
-                    nodes {{ id identifier }}
-                }}
-            }}
-        """
-    }
-
-    req = urllib.request.Request(
-        LINEAR_API,
-        data=json.dumps(query).encode("utf-8"),
-        headers={
-            "Authorization": api_key,
-            "Content-Type": "application/json",
-        },
-    )
-
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            result = json.loads(resp.read().decode())
-            nodes = result.get("data", {}).get("issueSearch", {}).get("nodes", [])
-            if nodes and nodes[0].get("identifier") == identifier:
-                return nodes[0]["id"]
-    except Exception:
+        issue = resolve_issue(identifier, api_key)
+        return issue.get("id")
+    except LinearError:
         pass
     return None
 
@@ -111,21 +62,23 @@ def main() -> int:
     p.add_argument("--key", default=os.getenv("LINEAR_API_KEY", ""), help="Linear API key")
     args = p.parse_args()
 
-    if not args.key:
-        sys.stderr.write("Error: LINEAR_API_KEY not set. Pass --key or set the env var.\n")
+    try:
+        key = api_key(args.key)
+    except LinearError as exc:
+        sys.stderr.write(f"Error: {exc}. Pass --key or set the env var.\n")
         return 1
 
     issue_id = args.issue
     # If it looks like an identifier (PROJ-42), resolve to UUID
     if "-" in issue_id and not issue_id.startswith("0"):
-        resolved = resolve_issue_id(issue_id, args.key)
+        resolved = resolve_issue_id(issue_id, key)
         if resolved:
             issue_id = resolved
         else:
             sys.stderr.write(f"Could not resolve {args.issue} to a Linear issue UUID.\n")
             return 1
 
-    if post_comment(issue_id, args.body, args.key):
+    if post_comment(issue_id, args.body, key):
         print(f"✓ Comment posted on {args.issue}")
         return 0
     else:

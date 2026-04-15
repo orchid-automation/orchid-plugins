@@ -33,7 +33,9 @@ You are a simplicity reviewer for a `linear-swarm` ship pipeline. You review ONE
 
 ## Review procedure
 
-1. `git diff main...<branch>` — every hunk
+1. Read the worker delta with the provided swarm base:
+   - Preferred: `git diff <base_sha>..<branch>`
+   - If the base branch moved after fan-out: `git diff origin/<base_branch>...<branch>`
 2. For each added function/class/file, ask: **is this used by more than one caller?** If not, inline it.
 3. For each added try/except, ask: **can this error actually happen?** If not, remove the guard.
 4. For each added comment, ask: **does removing this confuse a future reader?** If not, remove.

@@ -1,86 +1,9 @@
 #!/usr/bin/env bash
-# daytona-worker — one-command Daytona sandbox worker for linear-swarm
-#
-# Reads credentials from env vars (set globally in ~/.zshenv).
-# All the user needs to provide: --repo, --branch, --brief, --commit-msg
-#
-# Usage:
-#   daytona-worker --repo orchidautomation/sendlens --branch brandon/send-82 \
-#     --brief /tmp/brief.md --commit-msg "feat: install PromptInput (SEND-82)"
-#
-# Optional:
-#   --sandbox NAME      (default: claude-sandbox)
-#   --model SLUG        (default: zai/glm-5.1)
-#   --linear-issue ID   (default: none — no Linear comments)
-#   --timeout SECONDS   (default: 900)
+# Compatibility shim. The Daytona worker lane was replaced by sandbox-worker.
 
 set -euo pipefail
 
-# Source env vars if not already present (Claude Code hooks don't inherit shell profiles)
-for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
-  [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
-done
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Resolve script directory (handles symlinks from bin/ -> scripts/)
-SCRIPT_DIR="$(cd "$(dirname "$0")/../scripts" && pwd)"
-
-# Defaults from env vars — user never needs to pass these
-VAG_KEY="${VERCEL_AI_GATEWAY_KEY:-}"
-GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}}"
-LINEAR_KEY="${LINEAR_API_KEY:-}"
-
-# Parse args
-SANDBOX="claude-sandbox"
-MODEL="zai/glm-5.1"
-REPO=""
-BRANCH=""
-BRIEF=""
-COMMIT_MSG=""
-LINEAR_ISSUE=""
-TIMEOUT=900
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --sandbox)    SANDBOX="$2"; shift 2 ;;
-    --model)      MODEL="$2"; shift 2 ;;
-    --repo)       REPO="$2"; shift 2 ;;
-    --branch)     BRANCH="$2"; shift 2 ;;
-    --brief)      BRIEF="$2"; shift 2 ;;
-    --commit-msg) COMMIT_MSG="$2"; shift 2 ;;
-    --linear-issue) LINEAR_ISSUE="$2"; shift 2 ;;
-    --timeout)    TIMEOUT="$2"; shift 2 ;;
-    *) echo "Unknown arg: $1" >&2; exit 1 ;;
-  esac
-done
-
-# Validate required args
-for var in REPO BRANCH BRIEF COMMIT_MSG; do
-  if [ -z "${!var}" ]; then
-    echo "Error: --$(echo $var | tr '[:upper:]' '[:lower:]' | tr '_' '-') is required" >&2
-    exit 1
-  fi
-done
-
-if [ -z "$VAG_KEY" ]; then
-  echo "Error: VERCEL_AI_GATEWAY_KEY not set. Add to ~/.zshenv" >&2
-  exit 1
-fi
-
-if [ -z "$GH_TOKEN" ]; then
-  echo "Error: No GitHub token. Run 'gh auth login' or set GH_TOKEN" >&2
-  exit 1
-fi
-
-# Delegate to the Python script with all args resolved
-exec python3 "$SCRIPT_DIR/daytona_worker.py" \
-  --sandbox "$SANDBOX" \
-  --repo-url "https://github.com/$REPO.git" \
-  --branch "$BRANCH" \
-  --model "$MODEL" \
-  --brief-file "$BRIEF" \
-  --vag-key "$VAG_KEY" \
-  --gh-token "$GH_TOKEN" \
-  --commit-msg "$COMMIT_MSG" \
-  --linear-key "$LINEAR_KEY" \
-  --linear-issue "$LINEAR_ISSUE" \
-  --timeout "$TIMEOUT"
+printf 'linear-swarm: daytona-worker is deprecated; using sandbox-worker on Vercel Sandbox instead.\n' >&2
+exec "${SCRIPT_DIR}/sandbox-worker" "$@"

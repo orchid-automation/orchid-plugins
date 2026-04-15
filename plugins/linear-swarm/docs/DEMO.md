@@ -34,7 +34,7 @@ reference architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 ## What you'll see during the demo
 
 ```
-You type  ▶  /linear-swarm PLAYKIT "Infrastructure and observability" --worker=daytona
+You type  ▶  /linear-swarm PLAYKIT "Infrastructure and observability" --worker=sandbox
 
 Claude    ▶  Phase 0 — scope audit        [~30s]
 Claude    ▶  quality table + merge plan   [~gate: you say "go"]
@@ -58,8 +58,9 @@ Total: ~15–20 minutes for what normally takes a week.
 
 ```
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   Linear MCP    │   │      gh CLI     │   │  Claude Code    │
-│   (read tickets)│   │  (push/PR/merge)│   │ (orchestrator)  │
+│  LINEAR_API_KEY │   │      gh CLI     │   │  Claude Code    │
+│ (issue/project  │   │  (push/PR/merge)│   │ (orchestrator)  │
+│  reads + states)│   │                 │   │                 │
 └─────────────────┘   └─────────────────┘   └─────────────────┘
          │                     │                     │
          └─────────────────────┼─────────────────────┘
@@ -73,7 +74,9 @@ Total: ~15–20 minutes for what normally takes a week.
                                ▼
                    optional cheap-tier workers
                    ┌────────────────────────┐
-                   │ DAYTONA_API_KEY        │  ← cloud sandbox
+                   │ VERCEL_TOKEN           │  ← sandbox auth
+                   │ VERCEL_TEAM_ID         │  ← sandbox auth
+                   │ VERCEL_PROJECT_ID      │  ← sandbox auth
                    │ VERCEL_AI_GATEWAY_KEY  │  ← cheap models
                    └────────────────────────┘
 ```
@@ -133,7 +136,7 @@ guess on bad input.**
    │   - pytest case (code change)          │
    │   - checklist (docs/config/copy)       │
    │   - "manual-review" tag (ambiguous)    │
-   │ saves to docs/swarm/tests/<ID>.md      │
+   │ saves to /tmp/linear-swarm-tests/<ID>.md │
    └────────────────────────────────────────┘
 ```
 
@@ -152,7 +155,7 @@ guess on bad input.**
       │      │  │      │   │      │  ...   │      │  │      │
       │ wt/  │  │ wt/  │   │ wt/  │        │ wt/  │  │ wt/  │
       └──────┘  └──────┘   └──────┘        └──────┘  └──────┘
-         OR with --worker=daytona:
+         OR with --worker=sandbox:
       ┌──────┐  ┌──────┐   ┌──────┐        ┌──────┐  ┌──────┐
       │ ☁ sb │  │ ☁ sb │   │ ☁ sb │        │ ☁ sb │  │ ☁ sb │
       │GLM-5 │  │GLM-5 │   │GLM-5 │        │GLM-5 │  │GLM-5 │
@@ -161,7 +164,7 @@ guess on bad input.**
 
 **Two modes:**
 - `--worker=local` — git worktrees on your machine, Claude Max does the work
-- `--worker=daytona` — cloud sandboxes running cheap models via Vercel AI Gateway
+- `--worker=sandbox` — Vercel Sandboxes running cheap models via Vercel AI Gateway
 
 **Model escalation ladder** (auto-retries on smoke failure):
 ```
@@ -230,7 +233,7 @@ time. Smoke catches that.
 ```
    for each branch:
      git push -u origin <branch>
-     gh pr create --base main --head <branch>
+     gh pr create --base <swarm-base-branch> --head <branch>
      Linear issue:  Todo  →  In Review
 ```
 
@@ -254,7 +257,7 @@ time. Smoke catches that.
 ### Step 9 — DEPLOY + VERSION PROBE
 
 ```
-   main push  ──►  Railway/Vercel/Fly auto-deploys
+   deploy-branch push  ──►  Railway/Vercel/Fly auto-deploys
                           │
                           ▼
                    poll /health every 10s
@@ -268,9 +271,12 @@ time. Smoke catches that.
    │   - new JSON field                     │
    │   - commit hash at /version            │
    └────────────────────────────────────────┘
-                          │
-                          ▼
+                         │
+                         ▼
                     signal appears  ──►  advance
+
+   If swarm-base-branch != deploy branch:
+     mark this phase N/A for the run
 ```
 
 ### Step 10 — PROD VERIFY + COMPOUND
@@ -321,7 +327,7 @@ time. Smoke catches that.
 ┌─────────┐        ┌─────────┐        ┌──────────┐
 │ WORKERS │        │ REVIEW  │        │ GITHUB   │
 │         │        │         │        │          │
-│ ☁ daytona│◄──────►│ codex   │        │ gh pr    │
+│ ☁ sandbox│◄──────►│ codex   │        │ gh pr    │
 │  or     │        │ specialists│      │ merge    │
 │ 💻 local │        └─────────┘        └────┬─────┘
 └────┬────┘                                 │
@@ -350,10 +356,141 @@ time. Smoke catches that.
 /linear-swarm:linear-swarm PLAYKIT-22
 
 # Cheap-tier cloud workers
-/linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=daytona
+/linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=sandbox
 
-# Dry run (stop before push)
+# Dry run (stop before worker fan-out)
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --dry-run
+```
+
+---
+
+## Walkthrough: repo-local dry run
+
+A dry run is the fastest way to validate that `linear-swarm` can read your
+Linear issue, audit its tickets, and produce a merge plan — all without
+spawning workers, pushing branches, or touching production.
+
+### What `--dry-run` does
+
+`--dry-run` executes **Phases 1–2** (SCOPE and TEST DESIGN) and **skips
+Phases 3–10** (FAN-OUT through PROD VERIFY). No agents are spawned, no
+branches are created, no PRs are opened, and no deployments happen. You get
+the scope audit and the test design artifacts so you can inspect quality
+before committing to a full run.
+
+### Command shape
+
+```bash
+# Issue mode — single parent issue with subtasks
+/linear-swarm:linear-swarm <ISSUE-ID> --dry-run
+
+# Example
+/linear-swarm:linear-swarm PLAYKIT-22 --dry-run
+```
+
+### Step-by-step
+
+```
+1.  Point at a Linear issue that has subtasks already defined.
+    The issue must live in a project your LINEAR_API_KEY can read.
+
+2.  Run the command:
+      /linear-swarm:linear-swarm PLAYKIT-22 --dry-run
+
+3.  What you'll see:
+
+    Phase 1 — SCOPE
+      • linear-swarm reads every subtask on the parent issue
+      • audits each ticket: STRONG / OK / WEAK / UNFIT
+      • prints the file-overlap matrix and proposed merge order
+      • asks for your confirmation  ← you review and say "go" or "stop"
+
+    Phase 2 — TEST DESIGN
+      • orchestrator reads the repo files each ticket touches
+      • writes a test spec per ticket to /tmp/linear-swarm-tests/<ID>.md
+      • prints a summary table
+
+    ── dry run ends here ──
+    Phases 3–10 are skipped. No workers, no branches, no PRs, no deploys.
+
+4.  Inspect the output:
+      • Are all tickets STRONG or OK?  Fix WEAK/UNFIT tickets before a real run.
+      • Does the merge order look right?  The biggest refactor should be last.
+      • Do the test specs cover the acceptance criteria?
+
+5.  When you're satisfied, remove --dry-run and run for real:
+      /linear-swarm:linear-swarm PLAYKIT-22 --worker=sandbox
+```
+
+### Why start with a dry run?
+
+- **Catch bad input early.** Weak tickets (missing file paths, no acceptance
+  criteria) waste worker time. Fix them before paying for sandbox compute.
+- **Validate the merge plan.** A wrong merge order causes conflicts that the
+  merge ladder can't untangle. Cheaper to reorder now than to re-run later.
+- **No side effects.** Nothing is pushed, no Linear states change, no
+  Vercel Sandboxes are created. Safe to run repeatedly.
+
+---
+
+## Walkthrough: repo-local issue-mode on a non-default branch
+
+When you're working on a stacked branch (not `main`), `linear-swarm` records
+the branch you started from as the **swarm base branch**. This affects PR
+targets, review context, and whether deploy/prod-verify phases run.
+
+### Command shape
+
+```bash
+# Issue mode — runs against current branch as the base
+/linear-swarm:linear-swarm <ISSUE-ID>
+
+# Example: you're on feature/auth-v2 (branched from main)
+/linear-swarm:linear-swarm PLUXX-102
+```
+
+### What changes vs. a default-branch run
+
+1. **Review and PR base follow the swarm base branch.** When the orchestrator
+   opens PRs in Step 7, each PR targets the recorded swarm base branch — not
+   a hardcoded `main`. Reviews are also scoped against that base so diff
+   context matches what will actually merge.
+
+2. **Deploy and prod-verify are N/A.** If the swarm base branch is not the
+   deploy branch (the branch your CI/CD pipeline watches), Steps 9–10 are
+   marked N/A and skipped. There is nothing to deploy or verify — merging
+   into a feature branch doesn't trigger a production deploy.
+
+### Step-by-step
+
+```
+1.  Check out your feature branch:
+      git checkout feature/auth-v2
+
+2.  Run issue mode:
+      /linear-swarm:linear-swarm PLUXX-102
+
+3.  What you'll see:
+
+    Phase 1 — SCOPE
+      • swarm base recorded: feature/auth-v2
+      • tickets audited, merge plan produced
+
+    Phases 2–6 — TEST DESIGN → SMOKE
+      • same as a default-branch run
+
+    Phase 7 — PUSH + PR
+      • each PR targets feature/auth-v2 (the swarm base), not main
+
+    Phase 8 — MERGE
+      • squash-merges into feature/auth-v2
+
+    Phase 9 — DEPLOY        N/A  (swarm base ≠ deploy branch)
+    Phase 10 — PROD VERIFY  N/A  (swarm base ≠ deploy branch)
+
+4.  Result: your feature branch now contains the merged work.
+    When you later merge feature/auth-v2 into main, a separate
+    deploy/prod-verify cycle runs at that time.
 ```
 
 ---

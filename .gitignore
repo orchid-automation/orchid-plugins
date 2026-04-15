@@ -1,2 +1,3 @@
 # Sumble API output directory (created at runtime by --save flag)
 .sumble/
+.vercel

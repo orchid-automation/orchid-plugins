@@ -5,7 +5,7 @@
                         ──────────────────────────────
                         /linear-swarm:linear-swarm
                            <TEAM> <PROJECT_NAME>
-                           [--worker=local|daytona]
+                           [--worker=local|sandbox]
                            [--model=<slug>]
                            [--dry-run] [--skip-codex]
                                        │
@@ -13,11 +13,11 @@
 ┌───────────────────────────────────────────────────────────────────────┐
 │  PHASE 0 — SCOPE + QUALITY AUDIT                                       │
 │  ─────────────────────────────────────────────────────────────────    │
-│  mcp__linear__list_projects(team=<TEAM>)                               │
+│  linear-issue projects --team <TEAM> --query <PROJECT_NAME>            │
 │    fuzzy match <PROJECT_NAME> → projectId                              │
-│  mcp__linear__list_issues(project=projectId, parentId=null)            │
+│  linear-issue project-parents --project-id <PROJECT_ID>                │
 │    → parent tasks                                                      │
-│  for each parent: list_issues(parentId=parent.id)                      │
+│  for each parent: linear-issue children --parent <PARENT-ID>           │
 │    → subtasks become agent CONTEXT (not separate work units)           │
 │                                                                        │
 │  Quality audit per parent + subtasks:                                  │
@@ -28,6 +28,7 @@
 │    → score STRONG / OK / WEAK / UNFIT                                  │
 │                                                                        │
 │  File-overlap matrix → recommended merge order                         │
+│  Record swarm base branch + base SHA from the current checkout         │
 │                                                                        │
 │  ┌─────── USER CONFIRMATION GATE ───────┐                              │
 │  │ Weak tickets must be fixed externally │                              │
@@ -43,7 +44,7 @@
 │    - pytest/jest case if code change                                   │
 │    - structured checklist if docs/config/copy                          │
 │    - "manual-review-required" tag if neither                           │
-│  Stored at docs/swarm/tests/<ticket-id>.md                             │
+│  Stored at /tmp/linear-swarm-tests/<ticket-id>.md                      │
 │                                                                        │
 │  Critical: worker's job becomes "make these tests pass" instead of    │
 │  "figure out what to do". Big reliability gain for cheap-tier models.  │
@@ -56,11 +57,11 @@
 │       If --worker=local:                                               │
 │         Agent(isolation="worktree", subagent_type="general-purpose")   │
 │         (uses Claude Max, full smarts)                                 │
-│       If --worker=daytona:                                             │
-│         Skill(linear-swarm:daytona-worker)                             │
+│       If --worker=sandbox:                                             │
+│         Skill(linear-swarm:sandbox-worker)                             │
 │         (cheap-tier model via Vercel AI Gateway in sandbox)            │
-│         → pushes branch, then orchestrator mirrors it into a           │
-│           local git worktree for later phases                          │
+│         → syncs results back onto a local branch, optionally           │
+│           preserving a local worktree for later phases                 │
 │                                                                        │
 │  MODEL ESCALATION LADDER (on Phase 4 smoke failure):                   │
 │    Tier 1:  zai/glm-5.1                  ← default                     │
@@ -68,7 +69,8 @@
 │    Tier 3:  anthropic/claude-haiku-4.5                                 │
 │    Tier 4:  claude-opus via Max (switches to local worktree)           │
 │                                                                        │
-│  Each task ends Phase 1 with a branch plus a LOCAL worktree.           │
+│  Each task ends Phase 1 with a LOCAL branch and, when preserved,       │
+│  a reusable LOCAL worktree.                                            │
 │  Orchestrator records {ticket_id, branch, mode, agent_id?, tier}.      │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │ all agents returned
@@ -103,12 +105,12 @@
 │  ─────────────────────────────────────────────────────────────────    │
 │  For each NEEDS-CHANGES or BLOCKED branch:                             │
 │    local worker   → SendMessage(to=<original agent_id>, ...)           │
-│    daytona branch → spawn LOCAL worktree fix-up agent on mirror branch │
+│    sandbox branch → spawn LOCAL worktree fix-up agent on synced branch │
 │                                                                        │
 │  RULES:                                                                │
 │    - SendMessage only applies to long-lived local agents              │
-│    - Daytona workers are one-shot; later fix-ups run locally          │
-│    - Escalate model tier only when Phase 1 Daytona runs fail twice    │
+│    - Sandbox workers are one-shot; later fix-ups run locally          │
+│    - Escalate model tier only when Phase 1 sandbox runs fail twice    │
 │    - Re-run Phase 2 with --resume (not --fresh) so Codex has context  │
 │    - Loop until all READY                                              │
 └─────────────────────────────┬─────────────────────────────────────────┘
@@ -120,9 +122,9 @@
 │  Skill(linear-swarm:smoke-verify)                                      │
 │                                                                        │
 │  1. scaffold scripts/verify_refactor.py from template if missing       │
-│  2. capture baseline from pre-change main                              │
+│  2. capture baseline from the recorded swarm base ref                  │
 │  3. copy script + baseline to every LOCAL worktree                     │
-│     (including Daytona mirror branches)                                │
+│     (including sandbox-origin branches)                                │
 │  4. parallel: python3 scripts/verify_refactor.py --smoke               │
 │                                                                        │
 │  Smoke checks (all must pass):                                         │
@@ -133,7 +135,7 @@
 │                                                                        │
 │  Rejects error-prefix strings and non-JSON returns strictly.           │
 │                                                                        │
-│  STOP HERE if --dry-run.                                               │
+│  --dry-run should have already stopped after test design.              │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼
@@ -141,8 +143,8 @@
 │  PHASE 5 — PUSH + PR                                                   │
 │  ─────────────────────────────────────────────────────────────────    │
 │  Parallel, per branch:                                                 │
-│    git push -u origin <branch>    # sync if Daytona already pushed     │
-│    gh pr create --base main --head <branch>                            │
+│    git push -u origin <branch>    # first push for sandbox branches    │
+│    gh pr create --base <swarm-base-branch> --head <branch>             │
 │                                                                        │
 │  Move each Linear issue: Todo/Backlog → In Review                      │
 └─────────────────────────────┬─────────────────────────────────────────┘
@@ -164,14 +166,15 @@
 │      (for BIG refactor: surgical re-apply playbook — save dirs,       │
 │       hard-reset, restore, re-apply other PRs' changes to NEW         │
 │       file locations, re-smoke, force-push)                            │
-│    git fetch origin main                                               │
+│    git fetch origin <swarm-base-branch>                                │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼
 ┌───────────────────────────────────────────────────────────────────────┐
 │  PHASE 7 — DEPLOY + VERSION PROBE                                      │
 │  ─────────────────────────────────────────────────────────────────    │
-│  Auto-deploy triggered by main push (Railway, Vercel, Fly, etc)        │
+│  Auto-deploy triggered by deploy-branch push. If swarm base is         │
+│  not the deploy branch, this phase is N/A for the run.                 │
 │  Poll /health every 10s                                                │
 │                                                                        │
 │  CRITICAL: /health stays 200 during blue-green. Look for a             │
@@ -216,9 +219,9 @@
 │  ─────────────────────────────────────────────────────────────────    │
 │  git worktree remove --force (each)                                    │
 │  git branch -D (each)                                                  │
-│  git pull --ff-only origin main                                        │
+│  git pull --ff-only origin <swarm-base-branch>                         │
 │  Linear issues: In Review → Done                                       │
-│  Daytona sandbox: stop or snapshot                                     │
+│  Sandcastle worktrees: remove preserved local copies                   │
 │                                                                        │
 │  COMPOUND (graceful enhancement):                                      │
 │    If compound-engineering installed:                                  │
@@ -236,6 +239,10 @@
                               └─────────┘
 ```
 
+**Note:** Phases 2 (review), 4 (smoke), 5 (PR), and 6 (merge) operate relative to the recorded swarm base branch and base SHA — not the current HEAD of the deploy branch. This avoids false scope-creep findings when runs execute on stacked branches.
+
+**Validation tip:** Before running the swarm on real multi-repo epics, test with a parent issue whose subtasks all target the current repo. This exercises the full phase pipeline without cross-repo coordination noise, making orchestrator bugs easy to spot.
+
 ## Support systems (running alongside the phases)
 
 ```
@@ -248,32 +255,32 @@
 │  - git / gh / python3      │  │ prompts when required      │
 │    missing                 │  │ prerequisites are missing. │
 │  - GitHub auth missing     │  │                            │
-│  - VERCEL_AI_GATEWAY_KEY   │  │ Checks --worker=daytona    │
+│  - VERCEL_AI_GATEWAY_KEY   │  │ Checks --worker=sandbox    │
 │    not set (optional)      │  │ path specifically for      │
-│  - DAYTONA_API_KEY not     │  │ DAYTONA_API_KEY + VAG key  │
-│    set (optional)          │  │                            │
+│  - Vercel Sandbox auth not │  │ node/npm + sandbox auth +  │
+│    ready (optional)        │  │ VAG key                    │
 │                            │  │ Exit 2 = block the prompt  │
 │ Never blocks; exit 0       │  │ per Claude Code hooks API  │
 └────────────────────────────┘  └────────────────────────────┘
 
 ┌────────────────────────────┐  ┌────────────────────────────┐
-│ verify_refactor.py         │  │ daytona_worker.py          │
+│ verify_refactor.py         │  │ sandbox_worker.mjs         │
 │ ──────────────────         │  │ ──────────────────         │
-│ Lives in scripts/ of the   │  │ Wrapper around the base64  │
-│ target repo. Scaffolded    │  │ + exec pattern for running │
-│ from template on first     │  │ headless Claude Code       │
-│ run if missing.            │  │ inside Daytona sandboxes   │
-│                            │  │ via Vercel AI Gateway.     │
+│ Lives in scripts/ of the   │  │ Sandcastle wrapper for     │
+│ target repo. Scaffolded    │  │ headless Claude Code       │
+│ from template on first     │  │ inside Vercel Sandbox via  │
+│ run if missing.            │  │ Vercel AI Gateway.         │
 │ Customized per framework   │  │                            │
-│ by editing:                │  │ Handles shell-quoting traps│
-│  - TARGET_MODULE_NAME      │  │ that break plain           │
-│  - get_tool_names()        │  │ `daytona exec` calls.      │
-│  - dispatch_tool()         │  │                            │
-│  - SMOKE_TOOLS list        │  │ Must exit non-zero on      │
-│                            │  │ worker/commit/push errors. │
-│                            │  │ Successful runs push a     │
-│                            │  │ branch that gets mirrored  │
-│                            │  │ into a local worktree.     │
+│ by editing:                │  │ Handles runtime bootstrap, │
+│  - TARGET_MODULE_NAME      │  │ auth resolution, sync-back,│
+│  - get_tool_names()        │  │ and deterministic commit   │
+│  - dispatch_tool()         │  │ creation on local branches.│
+│  - SMOKE_TOOLS list        │  │                            │
+│                            │  │ Must exit non-zero on      │
+│                            │  │ worker/runtime/commit      │
+│                            │  │ errors. Successful runs    │
+│                            │  │ leave later phases on      │
+│                            │  │ normal local branches.     │
 └────────────────────────────┘  └────────────────────────────┘
 ```
 
