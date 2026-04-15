@@ -85,7 +85,7 @@
       "name": "linear-swarm",
       "source": "./plugins/linear-swarm",
       "description": "Ship a whole Linear project in one session by fanning out parallel worktree or Sandcastle-powered Vercel Sandbox agents, auditing with Codex + specialist reviewers, running structural smoke, sequentially merging PRs, deploying, and verifying against live production. Gracefully enhanced by Every's compound-engineering-plugin when both are installed.",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "author": {
         "name": "Orchid Automation"
       },

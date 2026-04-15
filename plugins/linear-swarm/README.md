@@ -16,7 +16,17 @@ For local development, validate the plugin before testing it:
 ```bash
 claude plugin validate ./plugins/linear-swarm
 claude --plugin-dir ./plugins/linear-swarm
+./plugins/linear-swarm/scripts/validate_swarm.sh
+./plugins/linear-swarm/scripts/validate_swarm.sh --target 'PLUXX-96 --worker=sandbox --dry-run --skip-codex'
 ```
+
+`validate_swarm.sh` is the checked-in hardening harness. It runs manifest/runtime syntax checks, exercises the sandbox runtime bootstrap, and can replay the exact nested `claude --plugin-dir ./plugins/linear-swarm -p "/linear-swarm:linear-swarm ..."` path that Codex used to test the plugin from outside Claude Code.
+
+> **Operator note — `validate_swarm.sh` modes**
+>
+> - **Static validation** (`validate_swarm.sh` without `--target`): runs manifest checks, syntax linting for shell/Python/Node helpers, and sandbox runtime bootstrap. Use after any code change to catch packaging or syntax regressions — no Claude credentials needed.
+> - **Nested replay** (`validate_swarm.sh --target '<args>'`): does everything static validation does, then replays the full nested `claude --plugin-dir` invocation with the given arguments. Requires `ANTHROPIC_API_KEY` or a logged-in Claude session. Use to verify end-to-end behavior before shipping.
+> - A successful `--dry-run` (e.g., `--target 'PLUXX-96 --dry-run'`) should stop after scope discovery (Phase 1) and test design (Phase 2), write shared specs to `/tmp/linear-swarm-tests`, and exit without spawning workers.
 
 ## Required environment
 
@@ -101,6 +111,7 @@ When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the res
 
 - **New here?** Start with [docs/DEMO.md](docs/DEMO.md) — a student-friendly walkthrough with ASCII diagrams for every step.
 - **Reference?** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full phase-by-phase diagram.
+- **Operator view?** See [docs/OPERATOR_FLOW.md](docs/OPERATOR_FLOW.md) for the control-plane/data-plane flow and the exact Codex -> Claude handoff.
 
 1. **Scope + Quality Audit** — Read Linear (project or parent issue), quality-audit every work item, user confirm
 2. **Test Design** — Orchestrator writes test specs per ticket before any agent spawns
