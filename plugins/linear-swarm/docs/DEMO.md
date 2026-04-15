@@ -452,7 +452,6 @@ at a different parent issue that still has work in Todo or In Progress. Then
 re-run the command.
 
 ---
-
 ## Walkthrough: repo-local issue-mode on a non-default branch
 
 When you're working on a stacked branch (not `main`), `linear-swarm` records
