@@ -433,6 +433,68 @@ before committing to a full run.
 
 ---
 
+## Walkthrough: repo-local issue-mode on a non-default branch
+
+When you're working on a stacked branch (not `main`), `linear-swarm` records
+the branch you started from as the **swarm base branch**. This affects PR
+targets, review context, and whether deploy/prod-verify phases run.
+
+### Command shape
+
+```bash
+# Issue mode — runs against current branch as the base
+/linear-swarm:linear-swarm <ISSUE-ID>
+
+# Example: you're on feature/auth-v2 (branched from main)
+/linear-swarm:linear-swarm PLUXX-102
+```
+
+### What changes vs. a default-branch run
+
+1. **Review and PR base follow the swarm base branch.** When the orchestrator
+   opens PRs in Step 7, each PR targets the recorded swarm base branch — not
+   a hardcoded `main`. Reviews are also scoped against that base so diff
+   context matches what will actually merge.
+
+2. **Deploy and prod-verify are N/A.** If the swarm base branch is not the
+   deploy branch (the branch your CI/CD pipeline watches), Steps 9–10 are
+   marked N/A and skipped. There is nothing to deploy or verify — merging
+   into a feature branch doesn't trigger a production deploy.
+
+### Step-by-step
+
+```
+1.  Check out your feature branch:
+      git checkout feature/auth-v2
+
+2.  Run issue mode:
+      /linear-swarm:linear-swarm PLUXX-102
+
+3.  What you'll see:
+
+    Phase 1 — SCOPE
+      • swarm base recorded: feature/auth-v2
+      • tickets audited, merge plan produced
+
+    Phases 2–6 — TEST DESIGN → SMOKE
+      • same as a default-branch run
+
+    Phase 7 — PUSH + PR
+      • each PR targets feature/auth-v2 (the swarm base), not main
+
+    Phase 8 — MERGE
+      • squash-merges into feature/auth-v2
+
+    Phase 9 — DEPLOY        N/A  (swarm base ≠ deploy branch)
+    Phase 10 — PROD VERIFY  N/A  (swarm base ≠ deploy branch)
+
+4.  Result: your feature branch now contains the merged work.
+    When you later merge feature/auth-v2 into main, a separate
+    deploy/prod-verify cycle runs at that time.
+```
+
+---
+
 ## Live demo example (2026-04-12 run)
 
 ```
