@@ -1,0 +1,20 @@
+{
+  "name": "orchid-plugins",
+  "interface": {
+    "displayName": "Orchid Plugins"
+  },
+  "plugins": [
+    {
+      "name": "linear-swarm-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/linear-swarm-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

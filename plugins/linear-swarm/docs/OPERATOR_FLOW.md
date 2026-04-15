@@ -67,8 +67,9 @@ Phase 3: execution
            -> runtime/sandbox_worker.mjs
            -> Sandcastle
            -> Vercel Sandbox
-           -> Claude Code inside sandbox
+           -> opencode by default (claude-code fallback)
            -> sync result back to local branch/worktree
+           -> optional `swarm-hitl` recovery on the same branch when `--hitl=on-error`
   |
   v
 Phase 4: review
@@ -85,6 +86,9 @@ Phase 6: smoke verify
   |
   v
 Phase 7: push + PR
+  |
+  +--> swarm-phase7
+  |      one manifest -> sequential push + PR create/reuse
   |
   v
 Phase 8: merge ladder
@@ -115,6 +119,7 @@ That split matters:
 
 - Claude auth gates the nested orchestrator run.
 - GitHub auth gates push and PR creation.
+- The orchestration is safest when approval-sensitive GitHub actions are batched through `swarm-phase7` instead of emitted as parallel `gh pr create` tool calls.
 - Linear API auth gates unattended issue reads/comments/state transitions.
 - Vercel auth gates sandbox execution.
 

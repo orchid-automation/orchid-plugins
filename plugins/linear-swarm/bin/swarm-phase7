@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# sandbox-worker compatibility wrapper — delegates to the shared linear-swarm runtime
+# swarm-phase7 compatibility wrapper — delegates to the shared linear-swarm runtime
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SHARED_ROOT="$(cd "${SCRIPT_DIR}/../../_shared/linear-swarm" && pwd)"
 
-exec "${SHARED_ROOT}/bin/sandbox-worker" "$@"
+exec "${SHARED_ROOT}/bin/swarm-phase7" "$@"

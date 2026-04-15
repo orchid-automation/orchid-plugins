@@ -44,6 +44,14 @@ require_command() {
   fi
 }
 
+require_executable_file() {
+  local path="$1"
+  if [ ! -x "$path" ]; then
+    printf 'Error: expected executable file: %s\n' "$path" >&2
+    exit 1
+  fi
+}
+
 claude_auth_ready() {
   if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
     return 0
@@ -81,19 +89,47 @@ mkdir -p "$LOG_DIR"
 scratch_root="$(mktemp -d "${TMPDIR:-/tmp}/linear-swarm-validate.XXXXXX")"
 trap 'rm -rf "$scratch_root"' EXIT
 
+require_executable_file "$PLUGIN_ROOT/bin/daytona-worker"
+require_executable_file "$PLUGIN_ROOT/bin/linear-comment"
+require_executable_file "$PLUGIN_ROOT/bin/linear-issue"
+require_executable_file "$PLUGIN_ROOT/bin/sandbox-worker"
+require_executable_file "$PLUGIN_ROOT/bin/swarm-hitl"
+require_executable_file "$PLUGIN_ROOT/bin/swarm-phase7"
+require_executable_file "$PLUGIN_ROOT/scripts/ensure_runtime.sh"
+require_executable_file "$REPO_ROOT/plugins/_shared/linear-swarm/bin/linear-comment"
+require_executable_file "$REPO_ROOT/plugins/_shared/linear-swarm/bin/linear-issue"
+require_executable_file "$REPO_ROOT/plugins/_shared/linear-swarm/bin/sandbox-worker"
+require_executable_file "$REPO_ROOT/plugins/_shared/linear-swarm/bin/swarm-hitl"
+require_executable_file "$REPO_ROOT/plugins/_shared/linear-swarm/bin/swarm-phase7"
+require_executable_file "$REPO_ROOT/plugins/_shared/linear-swarm/scripts/ensure_runtime.sh"
+
 run_step "Validate plugin manifest" claude plugin validate "$PLUGIN_ROOT"
 run_step "Check shell wrapper syntax" bash -n \
   "$PLUGIN_ROOT/bin/daytona-worker" \
+  "$PLUGIN_ROOT/bin/linear-comment" \
+  "$PLUGIN_ROOT/bin/linear-issue" \
   "$PLUGIN_ROOT/bin/sandbox-worker" \
+  "$PLUGIN_ROOT/bin/swarm-phase7" \
+  "$PLUGIN_ROOT/bin/swarm-hitl" \
   "$PLUGIN_ROOT/scripts/ensure_runtime.sh" \
   "$PLUGIN_ROOT/scripts/preflight.sh" \
-  "$PLUGIN_ROOT/scripts/linear_swarm_gate.sh"
+  "$PLUGIN_ROOT/scripts/linear_swarm_gate.sh" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/bin/linear-comment" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/bin/linear-issue" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/bin/sandbox-worker" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/bin/swarm-phase7" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/bin/swarm-hitl" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/scripts/ensure_runtime.sh"
 run_step "Check Python helper syntax" env \
   PYTHONPYCACHEPREFIX="$scratch_root/pycache" \
   python3 -m py_compile \
   "$PLUGIN_ROOT/scripts/linear_api.py" \
-  "$PLUGIN_ROOT/scripts/linear_comment.py"
-run_step "Check sandbox runtime syntax" node --check "$PLUGIN_ROOT/runtime/sandbox_worker.mjs"
+  "$PLUGIN_ROOT/scripts/linear_comment.py" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/scripts/linear_api.py" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/scripts/linear_comment.py"
+run_step "Check sandbox runtime syntax" node --check \
+  "$PLUGIN_ROOT/runtime/sandbox_worker.mjs" \
+  "$REPO_ROOT/plugins/_shared/linear-swarm/runtime/sandbox_worker.mjs"
 
 runtime_cache="$scratch_root/runtime-cache"
 mkdir -p "$runtime_cache"
@@ -110,7 +146,9 @@ if [ -n "$TARGET" ]; then
 
   timestamp="$(date +%Y%m%d%H%M%S)"
   nested_log="${LOG_DIR}/nested-${timestamp}.log"
-  prompt="/linear-swarm:linear-swarm ${TARGET}"
+  prompt="/linear-swarm:linear-swarm ${TARGET}
+
+Treat this as an unattended validation run. Auto-continue on a clean scope audit. If any tool use is rejected or interrupted, stop immediately and report the phase plus the exact action that failed."
 
   printf '==> Replay nested Claude session\n'
   printf '    prompt: %s\n' "$prompt"

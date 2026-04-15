@@ -99,11 +99,14 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 | `--worker=local\|sandbox` | `local` | Execute in local git worktrees (Claude Max) or Vercel Sandboxes (cheap tier) |
 | `--model=<slug>` | `zai/glm-5.1` | Tier-1 model when `--worker=sandbox` |
 | `--dry-run` | off | Run scope + test design only, write shared specs to `/tmp/linear-swarm-tests`, then stop before worker fan-out |
-| `--skip-codex` | off | Skip external Codex review (use only if Codex is unavailable) |
+| `--skip-codex` | off | Skip external Codex review and synthesize bundled or CE findings locally |
+| `--manual-confirm` | off | Force an explicit confirmation gate even when the scope audit is clean |
+| `--hitl=off\|on-error` | `off` | On sandbox worker failure, either stop immediately or hand off to interactive recovery |
 
 `--worker=daytona` is still accepted as a deprecated alias for `--worker=sandbox` so older prompts do not break.
 
 When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the result back onto a local git branch, and leaves the rest of the workflow uniform. Review, fix-up, smoke, PR, and merge phases all operate on normal local branches and worktrees.
+The shared sandbox runtime now defaults to `opencode` for the cloud worker lane, with `claude-code` retained as an explicit fallback provider.
 
 `linear-swarm` records a **swarm base branch + base SHA** at startup. Review, PR, smoke, merge, and cleanup all key off that recorded base instead of assuming `main`, so stacked runs stay scoped correctly.
 
@@ -113,13 +116,14 @@ When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the res
 - **Reference?** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full phase-by-phase diagram.
 - **Operator view?** See [docs/OPERATOR_FLOW.md](docs/OPERATOR_FLOW.md) for the control-plane/data-plane flow and the exact Codex -> Claude handoff.
 
-1. **Scope + Quality Audit** — Read Linear (project or parent issue), quality-audit every work item, user confirm
+1. **Scope + Quality Audit** — Read Linear (project or parent issue), quality-audit every work item, auto-continue on clean scope, block only on risky audit or `--manual-confirm`
 2. **Test Design** — Orchestrator writes test specs per ticket before any agent spawns
 3. **Fan-Out** — One agent per work item, in worktree OR sandbox
+   When `--hitl=on-error` is active, sandbox worker failures hand off to `swarm-hitl` instead of just dying.
 4. **Review** — CE `workflows:review` + `codex:rescue --fresh`
 5. **Fix-Up Loop** — reuse same agent with review findings; sandbox branches stay local after sync-back
 6. **Structural Smoke** — `scripts/verify_refactor.py` against baseline + real framework dispatch
-7. **Push + PRs** — `gh pr create --base <swarm-base-branch>` per branch, Linear → In Review
+7. **Push + PRs** — one `swarm-phase7` batch opens or reuses PRs sequentially, Linear → In Review
 8. **Merge Ladder** — dependency-safe order, rebase on the swarm base branch, big refactor LAST
 9. **Deploy + Prod Verify** — only when the swarm base branch is the deploy branch; otherwise mark this phase N/A
 10. **Compound + Cleanup** — write learnings, worktree/branch cleanup, Linear → Done
@@ -128,6 +132,7 @@ When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the res
 
 - **Linear as source of truth** — CE reads from `docs/brainstorms/` on disk; this reads Linear tickets (team, mobile, multi-user)
 - **Sandcastle + Vercel Sandbox workers** — run cheap-tier models via Vercel AI Gateway while syncing results back onto normal local branches
+- **Sandcastle HITL fallback** — failed sandbox runs can hand off to an interactive recovery session on the same branch
 - **Cross-code/ops prod verify** — Phase 9 catches ops-config regressions (missing env vars, feature flags) that every structural test will miss
 
 ## Attribution

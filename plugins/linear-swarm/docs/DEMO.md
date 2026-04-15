@@ -37,7 +37,7 @@ reference architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 You type  ▶  /linear-swarm PLAYKIT "Infrastructure and observability" --worker=sandbox
 
 Claude    ▶  Phase 0 — scope audit        [~30s]
-Claude    ▶  quality table + merge plan   [~gate: you say "go"]
+Claude    ▶  quality table + merge plan   [auto-continues if clean]
 Claude    ▶  Phase 1 — fan out 5 agents   [~5 min, parallel]
 Claude    ▶  Phase 2 — Codex + reviews    [~2 min]
 Claude    ▶  Phase 3 — fix-up loop        [~3 min]
@@ -94,10 +94,10 @@ Set API keys via the plugin's `userConfig` prompt, or in `~/.zshenv`.
 
 ## The 10 steps
 
-Each step is a **gate** — the run does not advance until the gate passes.
+Each step is a **gate** — the run does not advance until the gate passes. In turnkey mode, a clean scope audit passes automatically without waiting for a separate `go`.
 
 ```
-  1. SCOPE         you approve the plan
+  1. SCOPE         auto-continues if clean; blocks only on risky scope
   2. TEST DESIGN   orchestrator writes tests per ticket
   3. FAN-OUT       N agents work in parallel (worktree or sandbox)
   4. REVIEW        Codex + specialists judge every branch
@@ -118,7 +118,7 @@ Each step is a **gate** — the run does not advance until the gate passes.
                               file-overlap matrix
                               merge order (zero-overlap first, refactor last)
                               ┌───────────────────────┐
-                              │ USER CONFIRMATION ◄── │ you say "go"
+                              │ CLEAN SCOPE AUTO-RUN ◄│ risky scope blocks
                               └───────────────────────┘
 ```
 
@@ -231,9 +231,11 @@ time. Smoke catches that.
 ### Step 7 — PUSH + PR
 
 ```
-   for each branch:
-     git push -u origin <branch>
-     gh pr create --base <swarm-base-branch> --head <branch>
+   one deterministic batch:
+     swarm-phase7 --plan /tmp/linear-swarm-phase7.json
+
+   result:
+     push/reuse PRs sequentially
      Linear issue:  Todo  →  In Review
 ```
 
@@ -358,6 +360,9 @@ time. Smoke catches that.
 # Cheap-tier cloud workers
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=sandbox
 
+# Cheap-tier cloud workers with human rescue only on failure
+/linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=sandbox --hitl=on-error
+
 # Dry run (stop before worker fan-out)
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --dry-run
 ```
@@ -403,7 +408,7 @@ before committing to a full run.
       • linear-swarm reads every subtask on the parent issue
       • audits each ticket: STRONG / OK / WEAK / UNFIT
       • prints the file-overlap matrix and proposed merge order
-      • asks for your confirmation  ← you review and say "go" or "stop"
+      • auto-continues if the scope is clean; blocks only on risky input
 
     Phase 2 — TEST DESIGN
       • orchestrator reads the repo files each ticket touches

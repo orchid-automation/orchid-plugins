@@ -1,13 +1,13 @@
 ---
 name: sandbox-worker
-description: Internal skill. Runs a headless Claude Code worker inside a Sandcastle-managed Vercel Sandbox with a cheap model via Vercel AI Gateway. Syncs the result back onto a local git branch so later review, smoke, PR, and merge phases operate on normal local worktrees. Used by linear-swarm Phase 1 when --worker=sandbox.
+description: Internal skill. Runs a shared Sandcastle-managed Vercel Sandbox worker. Defaults to opencode plus a cheap model via Vercel AI Gateway, with claude-code available as a fallback provider. Syncs the result back onto a local git branch so later review, smoke, PR, and merge phases operate on normal local worktrees. Used by linear-swarm Phase 1 when --worker=sandbox.
 user-invocable: false
 allowed-tools: Bash, Read, Write
 ---
 
 # Sandbox Worker
 
-This skill wraps the "headless Claude Code in a Vercel Sandbox via Sandcastle" pattern. It's called by `linear-swarm` Phase 1 when the user picks `--worker=sandbox`.
+This skill wraps the shared "Sandcastle-managed Vercel Sandbox worker" pattern. It's called by `linear-swarm` Phase 1 when the user picks `--worker=sandbox`.
 
 ## Inputs
 
@@ -40,17 +40,21 @@ sandbox-worker \
   --branch brandon/send-82-elements \
   --brief /tmp/brief-SEND-82.md \
   --commit-msg "feat: install PromptInput and Suggestions (SEND-82, SEND-86)" \
+  --agent-provider opencode \
+  --hitl on-error \
   --linear-issue SEND-82
 ```
 
-The wrapper handles runtime install, Vercel auth resolution, Sandcastle execution, local branch sync-back, deterministic commit creation when the sandbox leaves uncommitted changes, and final status reporting.
+The wrapper handles runtime install, Vercel auth resolution, Sandcastle execution, local branch sync-back, deterministic commit creation when the sandbox leaves uncommitted changes, and final status reporting. The runtime itself is shared with the Codex-native plugin through `plugins/_shared/linear-swarm`.
 
 ## Behavioral rules
 
 - Never pass API keys in arguments or generated code. The wrapper reads env vars and plugin config automatically.
 - Treat the sandbox lane as a **Phase 1 implementation engine**, not a long-lived fix-up environment.
 - Later phases operate on the synced local branch or preserved local worktree.
+- Default worker provider is `opencode`; use `claude-code` only as an explicit fallback.
 - If the worker exits non-zero, stop the swarm and surface the sandbox error. Do not mark the ticket READY.
+- If `--hitl on-error` is active, the wrapper either launches a Sandcastle interactive recovery session (when a TTY is available) or prints a single `swarm-hitl ...` handoff command for the operator.
 
 ## Notes
 

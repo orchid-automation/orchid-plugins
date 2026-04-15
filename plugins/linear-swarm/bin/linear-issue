@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# linear-issue — query and update Linear issues for linear-swarm
+# linear-issue compatibility wrapper — delegates to the shared linear-swarm runtime
 
 set -euo pipefail
 
-for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
-  [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
-done
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SHARED_ROOT="$(cd "${SCRIPT_DIR}/../../_shared/linear-swarm" && pwd)"
 
-export PYTHONDONTWRITEBYTECODE=1
-
-SCRIPT_DIR="$(cd "$(dirname "$0")/../scripts" && pwd)"
-exec python3 "$SCRIPT_DIR/linear_api.py" --key "${LINEAR_API_KEY:-}" "$@"
+exec "${SHARED_ROOT}/bin/linear-issue" "$@"

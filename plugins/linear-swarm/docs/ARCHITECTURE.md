@@ -8,6 +8,8 @@
                            [--worker=local|sandbox]
                            [--model=<slug>]
                            [--dry-run] [--skip-codex]
+                           [--manual-confirm]
+                           [--hitl=off|on-error]
                                        │
                                        ▼
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -30,10 +32,11 @@
 │  File-overlap matrix → recommended merge order                         │
 │  Record swarm base branch + base SHA from the current checkout         │
 │                                                                        │
-│  ┌─────── USER CONFIRMATION GATE ───────┐                              │
-│  │ Weak tickets must be fixed externally │                              │
-│  │ via /linear-doc before proceeding     │                              │
-│  └───────────────────────────────────────┘                              │
+│  ┌──────────── RISK GATE ──────────────┐                               │
+│  │ Clean scope auto-continues          │                               │
+│  │ --manual-confirm forces a pause     │                               │
+│  │ Weak/blocking scope stops the run   │                               │
+│  └─────────────────────────────────────┘                               │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼
@@ -62,6 +65,8 @@
 │         (cheap-tier model via Vercel AI Gateway in sandbox)            │
 │         → syncs results back onto a local branch, optionally           │
 │           preserving a local worktree for later phases                 │
+│         → if --hitl=on-error and the AFK run fails, hand off to        │
+│           Sandcastle interactive recovery on the same branch           │
 │                                                                        │
 │  MODEL ESCALATION LADDER (on Phase 4 smoke failure):                   │
 │    Tier 1:  zai/glm-5.1                  ← default                     │
@@ -88,7 +93,7 @@
 │    Agent(subagent_type="linear-swarm:security-reviewer")               │
 │    Agent(subagent_type="linear-swarm:simplicity-reviewer")             │
 │                                                                        │
-│  THEN (always):                                                        │
+│  THEN (unless --skip-codex):                                           │
 │    Skill(codex:rescue) with "--fresh\n\n<review prompt>"               │
 │    ^^^ META-SYNTHESIS across all branches                              │
 │                                                                        │
@@ -142,11 +147,12 @@
 ┌───────────────────────────────────────────────────────────────────────┐
 │  PHASE 5 — PUSH + PR                                                   │
 │  ─────────────────────────────────────────────────────────────────    │
-│  Parallel, per branch:                                                 │
-│    git push -u origin <branch>    # first push for sandbox branches    │
-│    gh pr create --base <swarm-base-branch> --head <branch>             │
+│  Single deterministic batch helper:                                    │
+│    swarm-phase7 --plan /tmp/linear-swarm-phase7.json                   │
 │                                                                        │
-│  Move each Linear issue: Todo/Backlog → In Review                      │
+│  Pushes branches, opens or reuses PRs sequentially, and moves          │
+│  Linear issues to In Review without parallel approval-sensitive        │
+│  tool calls.                                                           │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼
@@ -267,7 +273,7 @@
 │ verify_refactor.py         │  │ sandbox_worker.mjs         │
 │ ──────────────────         │  │ ──────────────────         │
 │ Lives in scripts/ of the   │  │ Sandcastle wrapper for     │
-│ target repo. Scaffolded    │  │ headless Claude Code       │
+│ target repo. Scaffolded    │  │ shared sandbox workers     │
 │ from template on first     │  │ inside Vercel Sandbox via  │
 │ run if missing.            │  │ Vercel AI Gateway.         │
 │ Customized per framework   │  │                            │
@@ -277,6 +283,8 @@
 │  - dispatch_tool()         │  │ creation on local branches.│
 │  - SMOKE_TOOLS list        │  │                            │
 │                            │  │ Must exit non-zero on      │
+│                            │  │ Defaults to opencode with  │
+│                            │  │ claude-code as fallback.   │
 │                            │  │ worker/runtime/commit      │
 │                            │  │ errors. Successful runs    │
 │                            │  │ leave later phases on      │

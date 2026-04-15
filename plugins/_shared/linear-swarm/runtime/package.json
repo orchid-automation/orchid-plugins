@@ -1,0 +1,11 @@
+{
+  "name": "linear-swarm-runtime",
+  "private": true,
+  "version": "1.2.0",
+  "type": "module",
+  "description": "Shared Sandcastle + Vercel Sandbox worker runtime for linear-swarm plugins",
+  "dependencies": {
+    "@ai-hero/sandcastle": "0.4.7",
+    "@vercel/sandbox": "1.10.0"
+  }
+}
