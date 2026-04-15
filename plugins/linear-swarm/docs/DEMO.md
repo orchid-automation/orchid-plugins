@@ -433,6 +433,26 @@ before committing to a full run.
 
 ---
 
+## Troubleshooting: stale or completed validation targets
+
+If `linear-swarm` exits immediately after Phase 1 with no tickets to fan out,
+the validation target issue is likely in a state that prevents fan-out:
+
+- The parent issue is already **Done** — linear-swarm won't re-process
+  completed work.
+- The issue has **no open subtasks** — every subtask is Done/Cancelled, so
+  there's nothing to spawn workers for.
+- The issue **can't fan out** for other structural reasons (e.g., it's a
+  leaf ticket with no children, or the project filter returns zero matching
+  issues).
+
+**What to do:** create or refresh a parent issue that has open subtasks. You
+can reopen existing subtasks, add new ones to the parent, or point the swarm
+at a different parent issue that still has work in Todo or In Progress. Then
+re-run the command.
+
+---
+
 ## Walkthrough: repo-local issue-mode on a non-default branch
 
 When you're working on a stacked branch (not `main`), `linear-swarm` records
