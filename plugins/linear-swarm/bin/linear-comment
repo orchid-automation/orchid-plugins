@@ -12,5 +12,7 @@ for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
   [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
 done
 
+export PYTHONDONTWRITEBYTECODE=1
+
 SCRIPT_DIR="$(cd "$(dirname "$0")/../scripts" && pwd)"
 exec python3 "$SCRIPT_DIR/linear_comment.py" --key "${LINEAR_API_KEY:-}" "$@"
