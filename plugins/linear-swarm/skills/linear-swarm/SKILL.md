@@ -135,7 +135,7 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
    - Phase 3 complete: `"✓ Worker committed: <hash> — <summary of changes>"`
    - Phase 4 complete: `"[review] Review verdict: READY"` or `"⚠ Review: NEEDS-CHANGES — <finding>"`
    - Phase 7 complete: `"[pr] PR #<n> opened: <url>"`
-   - Phase 8 complete: `"[done] Merged to main"`
+   - Phase 8 complete: `"[done] Merged to <swarm-base-branch>"`
    - Phase 9 complete: `"[deploy] Deployed + prod smoke passed"`
    Sandbox workers post their own mid-work comments via the wrapper when `LINEAR_API_KEY` is available. Non-fatal — never block a phase on a failed comment.
 
@@ -196,7 +196,23 @@ If the first arg matches `[A-Z]+-[0-9]+` (e.g., `PROJ-66`), this is **issue mode
    - File-overlap warnings
    - Recommended merge order
    - Worker mode + model
+   - Swarm base branch + base SHA
 8. **USER CONFIRMATION GATE.** Wait for `go` / `yes` / `ship it`. Weak tickets should be fixed by the user via `/linear-doc` before proceeding. Do NOT auto-fix tickets.
+
+### Capture swarm base (both modes, before Phase 2)
+
+Record the branch/commit that every worker branch is stacked on:
+
+```bash
+SWARM_BASE_BRANCH="$(git branch --show-current)"
+SWARM_BASE_SHA="$(git rev-parse HEAD)"
+DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || echo main)"
+```
+
+Rules:
+- If `SWARM_BASE_BRANCH` is non-empty and exists on `origin`, treat that as the integration base for review, smoke, PRs, rebases, and cleanup.
+- If you are detached or the current branch is not pushed, fall back to `DEFAULT_BRANCH` for review/PR base and print a warning before Phase 3.
+- Scope creep is measured against `SWARM_BASE_SHA` (or the pushed `SWARM_BASE_BRANCH` tip), not blindly against `main`.
 
 ---
 
@@ -319,7 +335,7 @@ Tier 3:  anthropic/claude-haiku-4.5   ← guaranteed-compat safety net
 Tier 4:  claude-opus (via Max)         ← reserved for tickets the cheap tiers keep failing
 ```
 
-Orchestrator records `{ticket_id, branch, execution_mode, agent_id?, local_worktree, tier}` for Phases 2-7.
+Orchestrator records `{ticket_id, branch, execution_mode, agent_id?, local_worktree, tier, swarm_base_branch, swarm_base_sha}` for Phases 2-7.
 
 ---
 
@@ -329,7 +345,7 @@ Graceful enhancement: use CE's review fleet if installed.
 
 ### If compound-engineering plugin is installed
 ```
-Skill(compound-engineering:workflows:review) with: "--fresh\n\nReview these N branches..."
+Skill(compound-engineering:workflows:review) with: "--fresh\n\nReview these N branches against <SWARM_BASE_BRANCH> / <SWARM_BASE_SHA>..."
 ```
 CE's `/workflows:review` spawns 14+ specialist reviewers (security-sentinel, performance-oracle, architecture-strategist, code-simplicity-reviewer, Kieran-* reviewers, etc.) in parallel.
 
@@ -344,10 +360,16 @@ Agent(subagent_type: "linear-swarm:simplicity-reviewer", ...)
 ### Meta-synthesis — always runs
 After the review fleet (either CE or bundled):
 ```
-Skill(codex:rescue) with: "--fresh\n\nReview all branches + the review findings above..."
+Skill(codex:rescue) with: "--fresh\n\nReview all branches against <SWARM_BASE_BRANCH> / <SWARM_BASE_SHA> + the review findings above..."
 ```
 
 **CRITICAL: always prefix the codex prompt with `--fresh` on first call, `--resume` on every subsequent call.** Otherwise `codex:rescue` fires `AskUserQuestion` and halts automation.
+
+**Prompt content for every reviewer:**
+- Include `SWARM_BASE_BRANCH` and `SWARM_BASE_SHA`
+- Tell the reviewer to read `git diff <SWARM_BASE_SHA>..<branch>` (or `git diff origin/<SWARM_BASE_BRANCH>...<branch>` if the base branch moved)
+- Tell the reviewer that ancestor commits already present on the swarm base branch are NOT scope creep
+- If the worker's tip commit is available, reviewers may sanity-check `git show --stat <tip-commit>` to confirm the subtask scope quickly
 
 Output: per-branch verdict `READY / NEEDS-CHANGES / BLOCKED` with specific file:line findings.
 
@@ -402,7 +424,7 @@ Skill(linear-swarm:smoke-verify)
 
 It:
 1. Scaffolds `scripts/verify_refactor.py` in the target repo if missing (from template)
-2. Captures a baseline from current `main`
+2. Captures a baseline from `SWARM_BASE_SHA` / `SWARM_BASE_BRANCH`
 3. Copies script + baseline into each local worktree, including sandbox-origin branches
 4. Runs `python3 scripts/verify_refactor.py --smoke` in parallel across every worktree
 5. Asserts: module imports cleanly, framework inventory matches baseline, decoupling holds, **live tool dispatch through real framework call path returns valid JSON** (not error-prefix strings)
@@ -418,7 +440,7 @@ Every worktree must emit `✓ VERIFY PASSED` before advancing. On failure: back 
 Parallel, one bash call per branch:
 ```
 git push -u origin <branch>
-gh pr create --base main --head <branch> \
+gh pr create --base <SWARM_BASE_BRANCH> --head <branch> \
   --title "<conventional commit>" \
   --body <summary + Linear link + test plan>
 ```
@@ -448,8 +470,8 @@ for pr in ordered_list:
     # CONFLICT HANDLING
     if small conflict:
       cd <worktree>
-      git fetch origin main
-      git rebase origin/main
+      git fetch origin <SWARM_BASE_BRANCH>
+      git rebase origin/<SWARM_BASE_BRANCH>
       resolve markers inline OR SendMessage the agent
       python3 scripts/verify_refactor.py --smoke
       git push --force-with-lease origin <branch>
@@ -457,13 +479,13 @@ for pr in ordered_list:
     if BIG refactor conflict (touches files every other PR also modified):
       SendMessage(agent) with the surgical re-apply playbook:
         1. save branch's extracted dirs to /tmp
-        2. git reset --hard origin/main
+        2. git reset --hard origin/<SWARM_BASE_BRANCH>
         3. restore saved dirs
         4. re-apply every merged PR's changes to NEW file locations
         5. re-run smoke
         6. git push --force
       gh pr merge $pr --squash
-  git fetch origin main
+  git fetch origin <SWARM_BASE_BRANCH>
 ```
 
 ---
@@ -471,6 +493,8 @@ for pr in ordered_list:
 ## Phase 9 — Deploy + Version Probe
 
 Identify the deploy platform (Railway, Vercel, Fly, etc.) from the repo. Poll `/health` every 10s during rollover.
+
+If `SWARM_BASE_BRANCH` is not the repo's deploy branch, mark this phase `N/A for integration-branch run` and stop after Phase 8. Only run deploy/prod verification when the merge ladder lands on the actual deploy branch.
 
 **Critical:** `/health` stays 200 during blue-green. You need a VERSION SIGNAL — something in the response that proves new code is live:
 - A new HTTP response header added in this batch
@@ -518,8 +542,8 @@ for br in $(git branch --list "<prefix>*"); do
   git branch -D "$br"
 done
 
-# Pull main after cleanup
-git pull --ff-only origin main
+# Pull integration base after cleanup
+git pull --ff-only origin <SWARM_BASE_BRANCH>
 
 # Move Linear issues to Done (only if Phase 9 passed)
 for id in <ticket_ids>; do

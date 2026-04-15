@@ -95,6 +95,8 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 
 When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the result back onto a local git branch, and leaves the rest of the workflow uniform. Review, fix-up, smoke, PR, and merge phases all operate on normal local branches and worktrees.
 
+`linear-swarm` records a **swarm base branch + base SHA** at startup. Review, smoke, PR base, rebases, and cleanup all key off that recorded base instead of assuming `main`. That keeps feature-branch test runs scoped correctly.
+
 ## The 10 phases
 
 - **New here?** Start with [docs/DEMO.md](docs/DEMO.md) — a student-friendly walkthrough with ASCII diagrams for every step.
@@ -106,9 +108,9 @@ When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the res
 4. **Review** — CE `workflows:review` + `codex:rescue --fresh`
 5. **Fix-Up Loop** — reuse same agent with review findings; sandbox branches stay local after sync-back
 6. **Structural Smoke** — `scripts/verify_refactor.py` against baseline + real framework dispatch
-7. **Push + PRs** — `gh pr create` per branch, Linear → In Review
-8. **Merge Ladder** — dependency-safe order, rebase on conflict, big refactor LAST
-9. **Deploy + Prod Verify** — poll `/health`, version signal, then real-client prod smoke
+7. **Push + PRs** — `gh pr create --base <swarm-base-branch>` per branch, Linear → In Review
+8. **Merge Ladder** — dependency-safe order, rebase on the swarm base branch, big refactor LAST
+9. **Deploy + Prod Verify** — only when the swarm base branch is the deploy branch; otherwise mark this phase N/A
 10. **Compound + Cleanup** — write learnings, worktree/branch cleanup, Linear → Done
 
 ## What makes this different from CE alone

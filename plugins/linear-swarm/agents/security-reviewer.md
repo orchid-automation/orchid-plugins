@@ -28,7 +28,9 @@ Produce a verdict: **READY / NEEDS-CHANGES / BLOCKED** with specific file:line f
 
 ## Review procedure
 
-1. `git diff main...<branch>` — every hunk
+1. Read the worker delta with the provided swarm base:
+   - Preferred: `git diff <base_sha>..<branch>`
+   - If the base branch moved after fan-out: `git diff origin/<base_branch>...<branch>`
 2. For each hunk involving any of the patterns above, trace the data flow: where does input come from, where does it go, what validation is between?
 3. For any new outbound HTTP / subprocess / file open / eval / exec / deserialize, look for the security guard
 4. Check if secrets are added to any log/print/response/commit

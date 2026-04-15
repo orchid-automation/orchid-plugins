@@ -233,7 +233,7 @@ time. Smoke catches that.
 ```
    for each branch:
      git push -u origin <branch>
-     gh pr create --base main --head <branch>
+     gh pr create --base <swarm-base-branch> --head <branch>
      Linear issue:  Todo  →  In Review
 ```
 
@@ -257,7 +257,7 @@ time. Smoke catches that.
 ### Step 9 — DEPLOY + VERSION PROBE
 
 ```
-   main push  ──►  Railway/Vercel/Fly auto-deploys
+   deploy-branch push  ──►  Railway/Vercel/Fly auto-deploys
                           │
                           ▼
                    poll /health every 10s
@@ -271,9 +271,12 @@ time. Smoke catches that.
    │   - new JSON field                     │
    │   - commit hash at /version            │
    └────────────────────────────────────────┘
-                          │
-                          ▼
+                         │
+                         ▼
                     signal appears  ──►  advance
+
+   If swarm-base-branch != deploy branch:
+     mark this phase N/A for the run
 ```
 
 ### Step 10 — PROD VERIFY + COMPOUND

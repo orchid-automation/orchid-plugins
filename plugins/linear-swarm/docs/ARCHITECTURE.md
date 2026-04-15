@@ -28,6 +28,7 @@
 │    → score STRONG / OK / WEAK / UNFIT                                  │
 │                                                                        │
 │  File-overlap matrix → recommended merge order                         │
+│  Record swarm base branch + base SHA from the current checkout         │
 │                                                                        │
 │  ┌─────── USER CONFIRMATION GATE ───────┐                              │
 │  │ Weak tickets must be fixed externally │                              │
@@ -121,7 +122,7 @@
 │  Skill(linear-swarm:smoke-verify)                                      │
 │                                                                        │
 │  1. scaffold scripts/verify_refactor.py from template if missing       │
-│  2. capture baseline from pre-change main                              │
+│  2. capture baseline from the recorded swarm base ref                  │
 │  3. copy script + baseline to every LOCAL worktree                     │
 │     (including sandbox-origin branches)                                │
 │  4. parallel: python3 scripts/verify_refactor.py --smoke               │
@@ -143,7 +144,7 @@
 │  ─────────────────────────────────────────────────────────────────    │
 │  Parallel, per branch:                                                 │
 │    git push -u origin <branch>    # first push for sandbox branches    │
-│    gh pr create --base main --head <branch>                            │
+│    gh pr create --base <swarm-base-branch> --head <branch>             │
 │                                                                        │
 │  Move each Linear issue: Todo/Backlog → In Review                      │
 └─────────────────────────────┬─────────────────────────────────────────┘
@@ -165,14 +166,15 @@
 │      (for BIG refactor: surgical re-apply playbook — save dirs,       │
 │       hard-reset, restore, re-apply other PRs' changes to NEW         │
 │       file locations, re-smoke, force-push)                            │
-│    git fetch origin main                                               │
+│    git fetch origin <swarm-base-branch>                                │
 └─────────────────────────────┬─────────────────────────────────────────┘
                               │
                               ▼
 ┌───────────────────────────────────────────────────────────────────────┐
 │  PHASE 7 — DEPLOY + VERSION PROBE                                      │
 │  ─────────────────────────────────────────────────────────────────    │
-│  Auto-deploy triggered by main push (Railway, Vercel, Fly, etc)        │
+│  Auto-deploy triggered by deploy-branch push. If swarm base is         │
+│  not the deploy branch, this phase is N/A for the run.                 │
 │  Poll /health every 10s                                                │
 │                                                                        │
 │  CRITICAL: /health stays 200 during blue-green. Look for a             │
@@ -217,7 +219,7 @@
 │  ─────────────────────────────────────────────────────────────────    │
 │  git worktree remove --force (each)                                    │
 │  git branch -D (each)                                                  │
-│  git pull --ff-only origin main                                        │
+│  git pull --ff-only origin <swarm-base-branch>                         │
 │  Linear issues: In Review → Done                                       │
 │  Sandcastle worktrees: remove preserved local copies                   │
 │                                                                        │
