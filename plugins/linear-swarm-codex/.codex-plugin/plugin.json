@@ -1,0 +1,41 @@
+{
+  "name": "linear-swarm-codex",
+  "version": "0.1.0",
+  "description": "Codex-native control plane for Linear Swarm. Codex handles Linear scope, orchestration, review, and merge planning while cheap-tier cloud workers implement code in Vercel Sandbox.",
+  "author": {
+    "name": "Orchid Automation",
+    "email": "brandon@orchidautomation.com",
+    "url": "https://github.com/orchid-automation"
+  },
+  "homepage": "https://github.com/orchid-automation/orchid-plugins/tree/main/plugins/linear-swarm-codex",
+  "repository": "https://github.com/orchid-automation/orchid-plugins",
+  "license": "MIT",
+  "keywords": [
+    "linear",
+    "swarm",
+    "codex",
+    "orchestration",
+    "vercel-sandbox"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Linear Swarm Codex",
+    "shortDescription": "Codex-native swarm orchestration for Linear work.",
+    "longDescription": "Run Linear-scoped swarm work without nesting Claude Code. Codex owns scope audit, test design, review, and merge order while Vercel Sandbox workers execute cheap-tier cloud coding.",
+    "developerName": "Orchid Automation",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/orchid-automation/orchid-plugins/tree/main/plugins/linear-swarm-codex",
+    "privacyPolicyURL": "https://github.com/orchid-automation/orchid-plugins",
+    "termsOfServiceURL": "https://github.com/orchid-automation/orchid-plugins",
+    "defaultPrompt": [
+      "Run a Codex-native swarm for this Linear issue.",
+      "Scope this parent issue and fan out GLM 5.1 workers.",
+      "Review swarm branches and merge them in order."
+    ],
+    "brandColor": "#0F766E"
+  }
+}
