@@ -40,6 +40,7 @@ sandbox-worker \
   --branch brandon/send-82-elements \
   --brief /tmp/brief-SEND-82.md \
   --commit-msg "feat: install PromptInput and Suggestions (SEND-82, SEND-86)" \
+  --hitl on-error \
   --linear-issue SEND-82
 ```
 
@@ -51,6 +52,7 @@ The wrapper handles runtime install, Vercel auth resolution, Sandcastle executio
 - Treat the sandbox lane as a **Phase 1 implementation engine**, not a long-lived fix-up environment.
 - Later phases operate on the synced local branch or preserved local worktree.
 - If the worker exits non-zero, stop the swarm and surface the sandbox error. Do not mark the ticket READY.
+- If `--hitl on-error` is active, the wrapper either launches a Sandcastle interactive recovery session (when a TTY is available) or prints a single `swarm-hitl ...` handoff command for the operator.
 
 ## Notes
 

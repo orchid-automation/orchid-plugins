@@ -9,6 +9,7 @@
                            [--model=<slug>]
                            [--dry-run] [--skip-codex]
                            [--manual-confirm]
+                           [--hitl=off|on-error]
                                        │
                                        ▼
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -64,6 +65,8 @@
 │         (cheap-tier model via Vercel AI Gateway in sandbox)            │
 │         → syncs results back onto a local branch, optionally           │
 │           preserving a local worktree for later phases                 │
+│         → if --hitl=on-error and the AFK run fails, hand off to        │
+│           Sandcastle interactive recovery on the same branch           │
 │                                                                        │
 │  MODEL ESCALATION LADDER (on Phase 4 smoke failure):                   │
 │    Tier 1:  zai/glm-5.1                  ← default                     │

@@ -69,6 +69,7 @@ Phase 3: execution
            -> Vercel Sandbox
            -> Claude Code inside sandbox
            -> sync result back to local branch/worktree
+           -> optional `swarm-hitl` recovery on the same branch when `--hitl=on-error`
   |
   v
 Phase 4: review

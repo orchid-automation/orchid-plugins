@@ -86,6 +86,7 @@ run_step "Check shell wrapper syntax" bash -n \
   "$PLUGIN_ROOT/bin/daytona-worker" \
   "$PLUGIN_ROOT/bin/sandbox-worker" \
   "$PLUGIN_ROOT/bin/swarm-phase7" \
+  "$PLUGIN_ROOT/bin/swarm-hitl" \
   "$PLUGIN_ROOT/scripts/ensure_runtime.sh" \
   "$PLUGIN_ROOT/scripts/preflight.sh" \
   "$PLUGIN_ROOT/scripts/linear_swarm_gate.sh"

@@ -360,6 +360,9 @@ time. Smoke catches that.
 # Cheap-tier cloud workers
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=sandbox
 
+# Cheap-tier cloud workers with human rescue only on failure
+/linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --worker=sandbox --hitl=on-error
+
 # Dry run (stop before worker fan-out)
 /linear-swarm:linear-swarm PLAYKIT "Q2 Platform" --dry-run
 ```

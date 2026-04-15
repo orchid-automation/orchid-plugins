@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# swarm-hitl — enter a Sandcastle interactive recovery session for a linear-swarm branch
+
+set -euo pipefail
+
+for f in "$HOME/.zshenv" "$HOME/.bashrc" "$HOME/.profile"; do
+  [ -f "$f" ] && set -a && source "$f" 2>/dev/null && set +a
+done
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+vercel_cli_token() {
+  python3 - <<'PY'
+import json
+from pathlib import Path
+
+paths = [
+    Path.home() / ".vercel" / "auth.json",
+    Path.home() / "Library" / "Application Support" / "com.vercel.cli" / "auth.json",
+]
+
+for path in paths:
+    if not path.exists():
+        continue
+    try:
+        payload = json.loads(path.read_text())
+    except Exception:
+        continue
+    token = payload.get("token")
+    if token:
+        print(token)
+        break
+PY
+}
+
+promote_plugin_option() {
+  local name="$1"
+  local plugin_var="CLAUDE_PLUGIN_OPTION_${name}"
+  if [ -z "${!name:-}" ] && [ -n "${!plugin_var:-}" ]; then
+    export "${name}=${!plugin_var}"
+  fi
+}
+
+for name in \
+  LINEAR_API_KEY \
+  VERCEL_AI_GATEWAY_KEY \
+  VERCEL_OIDC_TOKEN \
+  VERCEL_TOKEN \
+  VERCEL_ACCESS_TOKEN \
+  VERCEL_TEAM_ID \
+  VERCEL_PROJECT_ID
+do
+  promote_plugin_option "$name"
+done
+
+if [ -z "${VERCEL_TOKEN:-}" ] && [ -z "${VERCEL_OIDC_TOKEN:-}" ]; then
+  cli_token="$(vercel_cli_token)"
+  if [ -n "$cli_token" ]; then
+    export VERCEL_TOKEN="$cli_token"
+  fi
+fi
+
+"${PLUGIN_ROOT}/scripts/ensure_runtime.sh"
+
+if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then
+  RUNTIME_DIR="${CLAUDE_PLUGIN_DATA}/runtime"
+elif [ -n "${XDG_CACHE_HOME:-}" ]; then
+  RUNTIME_DIR="${XDG_CACHE_HOME}/claude-code/linear-swarm/runtime"
+else
+  RUNTIME_DIR="${HOME}/.cache/claude-code/linear-swarm/runtime"
+fi
+
+exec node "${RUNTIME_DIR}/sandbox_worker.mjs" --enter-hitl "$@"

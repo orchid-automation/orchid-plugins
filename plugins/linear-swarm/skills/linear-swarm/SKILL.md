@@ -1,7 +1,7 @@
 ---
 name: linear-swarm
 description: Ship a whole Linear project in one session — fan out parallel agents across git worktrees or Sandcastle-powered Vercel Sandboxes, audit with Codex + specialist reviewers, run structural smoke, sequentially merge PRs, deploy, and verify against live prod. Gracefully delegates to Every's compound-engineering plugin when installed. Uses the bundled Linear CLI for unattended issue/project reads and workflow updates.
-argument-hint: "<TEAM> <PROJECT_NAME> | <ISSUE-ID>  [--worker=local|sandbox] [--model=<slug>] [--dry-run] [--skip-codex] [--manual-confirm]"
+argument-hint: "<TEAM> <PROJECT_NAME> | <ISSUE-ID>  [--worker=local|sandbox] [--model=<slug>] [--dry-run] [--skip-codex] [--manual-confirm] [--hitl=off|on-error]"
 user-invocable: true
 allowed-tools: Agent, SendMessage, Bash, Read, Write, Edit, Grep, Glob, Skill, TaskCreate, TaskUpdate, TaskList
 ---
@@ -57,6 +57,7 @@ Fetches the parent issue + its subtasks. Each subtask = one agent. The parent de
 - `--dry-run` — run Phases 1-2 only, write shared test specs to `/tmp/linear-swarm-tests`, and halt before any worker, branch, worktree, or push activity
 - `--skip-codex` — skip the Codex meta-review and use CE or bundled reviewers only
 - `--manual-confirm` — force an explicit confirmation pause even when the scope audit is clean
+- `--hitl=off|on-error` — on sandbox worker failure, either stop immediately or hand off to a human-in-the-loop recovery flow
 
 ---
 
@@ -66,7 +67,7 @@ Treat `/linear-swarm` as an automation-first workflow.
 
 - If the user explicitly invoked `/linear-swarm` and the Phase 1 audit is `STRONG` or `OK` with no blocking overlap, that invocation counts as approval. Print the plan, mark it auto-approved, and continue.
 - Only stop for confirmation when the user passed `--manual-confirm` or the audit found `WEAK` / `UNFIT` tickets, missing file paths, missing acceptance criteria, or blocking overlap that makes the merge plan unsafe.
-- Any rejected, interrupted, or denied tool call is a hard phase failure. Report the phase, the exact tool/action that failed, the stderr or rejection text, and stop. Never sit idle waiting for a follow-up tool approval in unattended mode.
+- Any rejected, interrupted, or denied tool call is a hard phase failure. Report the phase, the exact tool/action that failed, the stderr or rejection text, and stop. Never sit idle waiting for a follow-up tool approval in unattended mode unless `--hitl=on-error` is explicitly active for a sandbox worker failure.
 
 ## Presentation Rules (CRITICAL — follow before executing ANY phase)
 
@@ -287,10 +288,15 @@ sandbox-worker \
   --branch brandon/send-82-elements \
   --brief /tmp/brief-SEND-82.md \
   --commit-msg "feat: install PromptInput and Suggestions (SEND-82, SEND-86)" \
+  --hitl on-error \
   --linear-issue SEND-82
 ```
 
 That's it. The script handles: runtime bootstrap, Vercel auth resolution, Sandcastle execution, local branch sync-back, deterministic commit creation when needed, and Linear comments. **All credentials come from env vars or plugin settings — never pass keys in arguments or generated code.**
+
+If `--hitl=on-error` is active and the sandbox run fails:
+- with an interactive TTY, the wrapper launches a Sandcastle `interactive()` recovery session on the same branch
+- without a TTY, the wrapper stops and prints a single `swarm-hitl ...` command the operator can run manually
 
 For parallel workers, run multiple `sandbox-worker` calls as background Bash commands. Each gets its own sandbox and local branch state automatically.
 
@@ -306,6 +312,7 @@ git worktree add .sandcastle/worktrees/<ticket-id> <branch>
 |---|---|
 | `sandbox-worker --repo R --branch B --brief F --commit-msg M` | Full sandbox worker lifecycle |
 | `daytona-worker --repo R --branch B --brief F --commit-msg M` | Deprecated alias for `sandbox-worker` |
+| `swarm-hitl --branch B --brief F --commit-msg M` | Launch an interactive recovery session on a swarm branch |
 | `linear-comment --issue ID --body "message"` | Post a comment to a Linear issue |
 | `swarm-phase7 --plan P` | Push branches + open PRs sequentially from one manifest |
 

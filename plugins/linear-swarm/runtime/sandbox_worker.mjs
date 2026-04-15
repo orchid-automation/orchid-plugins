@@ -5,11 +5,12 @@ import { spawnSync } from "node:child_process";
 import { basename, resolve } from "node:path";
 import process from "node:process";
 
-import { claudeCode, run } from "@ai-hero/sandcastle";
+import { claudeCode, createSandbox, run } from "@ai-hero/sandcastle";
 import { vercel } from "@ai-hero/sandcastle/sandboxes/vercel";
 
 const DEFAULT_MODEL = "zai/glm-5.1";
 const DEFAULT_TIMEOUT_SECONDS = 900;
+const DEFAULT_HITL_MODE = "off";
 const SWARM_GIT_EMAIL = "linear-swarm@orchidautomation.com";
 const SWARM_GIT_NAME = "orchid-linear-swarm";
 
@@ -21,8 +22,11 @@ Options:
   --repo <owner/repo>          Validate the current repo slug against origin
   --repo-url <url>             Validate the current repo remote URL
   --model <slug>               Claude-compatible model slug (default: ${DEFAULT_MODEL})
+  --hitl <off|on-error>        Launch or prepare a human-in-the-loop recovery session on worker failure
   --linear-issue <ISSUE-ID>    Post progress comments to Linear if LINEAR_API_KEY is available
   --ticket-id <ISSUE-ID>       Optional ticket id for log naming
+  --failure <message>          Failure text passed to direct HITL entry
+  --enter-hitl                 Skip the AFK sandbox run and enter HITL directly
   --timeout <seconds>          Sandbox timeout in seconds (default: ${DEFAULT_TIMEOUT_SECONDS})
   --sandbox <name>             Accepted for compatibility; ignored
   --help                       Show this help
@@ -87,6 +91,9 @@ function parseArgs(argv) {
     linearIssue: "",
     ticketId: "",
     timeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
+    hitlMode: DEFAULT_HITL_MODE,
+    failureMessage: "",
+    enterHitl: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -130,6 +137,20 @@ function parseArgs(argv) {
         break;
       case "--ticket-id":
         parsed.ticketId = takeValue();
+        break;
+      case "--hitl": {
+        const value = takeValue();
+        if (!["off", "on-error"].includes(value)) {
+          fail("--hitl must be one of: off, on-error");
+        }
+        parsed.hitlMode = value;
+        break;
+      }
+      case "--failure":
+        parsed.failureMessage = takeValue();
+        break;
+      case "--enter-hitl":
+        parsed.enterHitl = true;
         break;
       case "--timeout": {
         const value = Number.parseInt(takeValue(), 10);
@@ -284,6 +305,222 @@ function shortSha(sha) {
   return sha.slice(0, 12);
 }
 
+function buildAgentEnv(gatewayKey) {
+  return {
+    ANTHROPIC_BASE_URL: "https://ai-gateway.vercel.sh",
+    ANTHROPIC_AUTH_TOKEN: gatewayKey,
+    ANTHROPIC_API_KEY: "",
+  };
+}
+
+function buildVercelSandbox(auth, timeoutSeconds) {
+  return vercel({
+    runtime: "node22",
+    timeout: timeoutSeconds * 1000,
+    resources: { vcpus: 4 },
+    ...(auth.token
+      ? {
+          token: auth.token,
+          teamId: auth.teamId,
+          projectId: auth.projectId,
+        }
+      : {}),
+  });
+}
+
+function buildSandboxHooks() {
+  return {
+    onSandboxReady: [
+      {
+        command: "command -v git >/dev/null 2>&1 || (echo 'git is required inside the Vercel Sandbox runtime' >&2; exit 1)",
+      },
+      {
+        command: "command -v claude >/dev/null 2>&1 || (npm install -g @anthropic-ai/claude-code >/tmp/linear-swarm-claude-install.log 2>&1 || (cat /tmp/linear-swarm-claude-install.log >&2; exit 1))",
+      },
+      {
+        command: `git config --global user.email ${SWARM_GIT_EMAIL} && git config --global user.name ${SWARM_GIT_NAME}`,
+      },
+    ],
+  };
+}
+
+function shellQuote(value) {
+  if (value.length === 0) {
+    return "''";
+  }
+
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function canLaunchInteractiveHitl() {
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY && process.stderr.isTTY);
+}
+
+function gitRevParseOrFallback(repoRoot, ref, fallback) {
+  try {
+    return execGit(["rev-parse", ref], { cwd: repoRoot }).stdout.trim();
+  } catch {
+    return fallback;
+  }
+}
+
+function buildHitlPrompt(args, brief, failureMessage) {
+  return [
+    `You are resuming Linear swarm work on branch \`${args.branch}\`.`,
+    args.linearIssue ? `Linear issue: ${args.linearIssue}` : "",
+    "This is a human-in-the-loop recovery session triggered because the automated sandbox run failed or produced no usable commit.",
+    failureMessage ? `Failure that triggered the handoff:\n${failureMessage}` : "",
+    "Original worker brief:",
+    brief,
+    [
+      "Instructions:",
+      "1. Inspect the current branch and repository state.",
+      "2. Recover the task with the minimum necessary changes.",
+      "3. Run the checks described in the brief.",
+      `4. Commit with this message when the branch is ready: ${args.commitMessage}`,
+      "5. Stop once the branch is ready for the normal review, smoke, and PR phases.",
+    ].join("\n"),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function buildHitlCommand(args, failureMessage = "") {
+  const pieces = [
+    "swarm-hitl",
+    "--branch",
+    shellQuote(args.branch),
+    "--brief",
+    shellQuote(resolve(args.briefPath)),
+    "--commit-msg",
+    shellQuote(args.commitMessage),
+    "--model",
+    shellQuote(args.model),
+  ];
+
+  if (args.repo) {
+    pieces.push("--repo", shellQuote(args.repo));
+  }
+  if (args.repoUrl) {
+    pieces.push("--repo-url", shellQuote(args.repoUrl));
+  }
+  if (args.linearIssue) {
+    pieces.push("--linear-issue", shellQuote(args.linearIssue));
+  }
+  if (args.ticketId) {
+    pieces.push("--ticket-id", shellQuote(args.ticketId));
+  }
+  if (failureMessage) {
+    pieces.push("--failure", shellQuote(failureMessage));
+  }
+
+  return pieces.join(" ");
+}
+
+async function maybeEnterHitl({
+  repoRoot,
+  args,
+  brief,
+  baseSha,
+  auth,
+  linearKey,
+  gatewayKey,
+  failureMessage,
+}) {
+  const startSha = gitRevParseOrFallback(repoRoot, args.branch, baseSha);
+
+  if (!canLaunchInteractiveHitl()) {
+    const command = buildHitlCommand(args, failureMessage);
+    try {
+      await postLinearComment(
+        linearKey,
+        args.linearIssue,
+        `[hitl] Automated sandbox run failed on \`${args.branch}\`. Resume manually with:\n\`\`\`bash\n${command}\n\`\`\``,
+      );
+    } catch {
+      // Non-fatal.
+    }
+    throw new Error(
+      `sandbox-worker failed on ${args.branch}; no interactive TTY is available for HITL. Resume manually with:\n${command}`,
+    );
+  }
+
+  let sandbox;
+  let preservedWorkspacePath = "";
+  try {
+    sandbox = await createSandbox({
+      branch: args.branch,
+      sandbox: buildVercelSandbox(auth, args.timeoutSeconds),
+      hooks: buildSandboxHooks(),
+      throwOnDuplicateWorktree: false,
+    });
+
+    try {
+      await postLinearComment(
+        linearKey,
+        args.linearIssue,
+        `[hitl] Entering interactive recovery on \`${args.branch}\``,
+      );
+    } catch {
+      // Non-fatal.
+    }
+
+    await sandbox.interactive({
+      agent: claudeCode(args.model, {
+        env: buildAgentEnv(gatewayKey),
+      }),
+      prompt: buildHitlPrompt(args, brief, failureMessage),
+      name: `${args.ticketId || args.branch}-hitl`,
+    });
+
+    const statusBeforeCommit = execGit(["status", "--porcelain"], {
+      cwd: sandbox.worktreePath,
+    }).stdout.trim();
+    if (statusBeforeCommit) {
+      execGit(["add", "-A"], { cwd: sandbox.worktreePath });
+      execGit(
+        [
+          "-c",
+          `user.email=${SWARM_GIT_EMAIL}`,
+          "-c",
+          `user.name=${SWARM_GIT_NAME}`,
+          "commit",
+          "-m",
+          args.commitMessage,
+        ],
+        { cwd: sandbox.worktreePath },
+      );
+    }
+
+    const finalSha = execGit(["rev-parse", args.branch], { cwd: repoRoot }).stdout.trim();
+    if (finalSha === startSha) {
+      throw new Error(`HITL session ended without a new commit on ${args.branch}`);
+    }
+
+    try {
+      await postLinearComment(
+        linearKey,
+        args.linearIssue,
+        `✓ HITL committed \`${shortSha(finalSha)}\` on \`${args.branch}\``,
+      );
+    } catch {
+      // Non-fatal.
+    }
+
+    return {
+      finalSha,
+      preservedWorktreePath: "",
+      commits: [],
+      mode: "hitl",
+    };
+  } finally {
+    if (sandbox) {
+      const closeResult = await sandbox.close();
+      preservedWorkspacePath = closeResult?.preservedWorkspacePath || "";
+    }
+  }
+}
+
 async function postLinearComment(linearKey, issueId, body) {
   if (!linearKey || !issueId) {
     return;
@@ -408,6 +645,10 @@ async function main() {
     process.env.VERCEL_PROJECT_ID = auth.projectId;
   }
 
+  if (args.enterHitl && !gatewayKey) {
+    fail("VERCEL_AI_GATEWAY_KEY is required for swarm-hitl recovery sessions");
+  }
+
   const pluginDataDir = getPluginDataDir();
   const repoKey = sanitizeForPath(originSlug || basename(repoRoot));
   const logDir = resolve(pluginDataDir, "logs", repoKey);
@@ -424,28 +665,34 @@ async function main() {
     // Non-fatal. Linear is an audit trail, not a hard dependency.
   }
 
+  if (args.enterHitl) {
+    const hitlResult = await maybeEnterHitl({
+      repoRoot,
+      args,
+      brief,
+      baseSha,
+      auth,
+      linearKey,
+      gatewayKey,
+      failureMessage: args.failureMessage || "Manual HITL requested.",
+    });
+    console.log(`FINAL COMMIT: ${hitlResult.finalSha}`);
+    console.log(`BRANCH:       ${args.branch}`);
+    console.log(`LOG FILE:     ${logPath}`);
+    console.log("MODE:         hitl");
+    return;
+  }
+
   let result;
+  let finalSha = "";
+  let preservedWorktreePath = "";
+  let completionMode = "sandbox";
   try {
     result = await run({
       agent: claudeCode(args.model, {
-        env: {
-          ANTHROPIC_BASE_URL: "https://ai-gateway.vercel.sh",
-          ANTHROPIC_AUTH_TOKEN: gatewayKey,
-          ANTHROPIC_API_KEY: "",
-        },
+        env: buildAgentEnv(gatewayKey),
       }),
-      sandbox: vercel({
-        runtime: "node22",
-        timeout: args.timeoutSeconds * 1000,
-        resources: { vcpus: 4 },
-        ...(auth.token
-          ? {
-              token: auth.token,
-              teamId: auth.teamId,
-              projectId: auth.projectId,
-            }
-          : {}),
-      }),
+      sandbox: buildVercelSandbox(auth, args.timeoutSeconds),
       prompt: brief,
       logging: {
         type: "file",
@@ -456,77 +703,85 @@ async function main() {
         branch: args.branch,
       },
       hooks: {
-        onSandboxReady: [
-          {
-            command: "command -v git >/dev/null 2>&1 || (echo 'git is required inside the Vercel Sandbox runtime' >&2; exit 1)",
-          },
-          {
-            command: "command -v claude >/dev/null 2>&1 || (npm install -g @anthropic-ai/claude-code >/tmp/linear-swarm-claude-install.log 2>&1 || (cat /tmp/linear-swarm-claude-install.log >&2; exit 1))",
-          },
-          {
-            command: `git config --global user.email ${SWARM_GIT_EMAIL} && git config --global user.name ${SWARM_GIT_NAME}`,
-          },
-        ],
+        ...buildSandboxHooks(),
       },
       maxIterations: 1,
       idleTimeoutSeconds: args.timeoutSeconds,
       name: args.ticketId || args.branch,
       throwOnDuplicateWorktree: false,
     });
+    preservedWorktreePath = result.preservedWorktreePath || "";
+    if (preservedWorktreePath) {
+      const statusBeforeCommit = execGit(["status", "--porcelain"], { cwd: preservedWorktreePath }).stdout.trim();
+      if (statusBeforeCommit) {
+        execGit(["add", "-A"], { cwd: preservedWorktreePath });
+        execGit(
+          [
+            "-c",
+            `user.email=${SWARM_GIT_EMAIL}`,
+            "-c",
+            `user.name=${SWARM_GIT_NAME}`,
+            "commit",
+            "-m",
+            args.commitMessage,
+          ],
+          { cwd: preservedWorktreePath },
+        );
+      }
+    }
+
+    finalSha = execGit(["rev-parse", args.branch], { cwd: repoRoot }).stdout.trim();
+    if (finalSha === baseSha) {
+      throw new Error(`sandbox-worker completed without changing ${args.branch}`);
+    }
   } catch (error) {
-    try {
-      await postLinearComment(
-        linearKey,
-        args.linearIssue,
-        `✗ Sandbox worker failed on \`${args.branch}\`: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    } catch {
-      // Non-fatal.
+    const failureMessage = error instanceof Error ? error.message : String(error);
+    if (args.hitlMode === "on-error") {
+      try {
+        const hitlResult = await maybeEnterHitl({
+          repoRoot,
+          args,
+          brief,
+          baseSha,
+          auth,
+          linearKey,
+          gatewayKey,
+          failureMessage,
+        });
+        finalSha = hitlResult.finalSha;
+        preservedWorktreePath = hitlResult.preservedWorktreePath || "";
+        completionMode = hitlResult.mode;
+      } catch (hitlError) {
+        try {
+          await postLinearComment(
+            linearKey,
+            args.linearIssue,
+            `✗ Sandbox worker failed on \`${args.branch}\`: ${failureMessage}`,
+          );
+        } catch {
+          // Non-fatal.
+        }
+        throw hitlError;
+      }
+    } else {
+      try {
+        await postLinearComment(
+          linearKey,
+          args.linearIssue,
+          `✗ Sandbox worker failed on \`${args.branch}\`: ${failureMessage}`,
+        );
+      } catch {
+        // Non-fatal.
+      }
+      throw error;
     }
-    throw error;
-  }
-
-  let preservedWorktreePath = result.preservedWorktreePath || "";
-  if (preservedWorktreePath) {
-    const statusBeforeCommit = execGit(["status", "--porcelain"], { cwd: preservedWorktreePath }).stdout.trim();
-    if (statusBeforeCommit) {
-      execGit(["add", "-A"], { cwd: preservedWorktreePath });
-      execGit(
-        [
-          "-c",
-          `user.email=${SWARM_GIT_EMAIL}`,
-          "-c",
-          `user.name=${SWARM_GIT_NAME}`,
-          "commit",
-          "-m",
-          args.commitMessage,
-        ],
-        { cwd: preservedWorktreePath },
-      );
-    }
-  }
-
-  const finalSha = execGit(["rev-parse", args.branch], { cwd: repoRoot }).stdout.trim();
-  const branchChanged = finalSha !== baseSha;
-
-  if (!branchChanged) {
-    try {
-      await postLinearComment(
-        linearKey,
-        args.linearIssue,
-        `✗ Sandbox worker produced no changes on \`${args.branch}\``,
-      );
-    } catch {
-      // Non-fatal.
-    }
-    fail(`sandbox-worker completed without changing ${args.branch}`);
   }
 
   try {
     await postLinearComment(
       linearKey,
       args.linearIssue,
-      `✓ Sandbox worker committed \`${shortSha(finalSha)}\` on \`${args.branch}\``,
+      `✓ ${completionMode === "hitl" ? "HITL recovery" : "Sandbox worker"} committed \`${shortSha(finalSha)}\` on \`${args.branch}\``,
     );
   } catch {
     // Non-fatal.
@@ -535,10 +790,11 @@ async function main() {
   console.log(`FINAL COMMIT: ${finalSha}`);
   console.log(`BRANCH:       ${args.branch}`);
   console.log(`LOG FILE:     ${logPath}`);
+  console.log(`MODE:         ${completionMode}`);
   if (preservedWorktreePath) {
     console.log(`WORKTREE:     ${preservedWorktreePath}`);
   }
-  if (result.commits.length > 0) {
+  if (result?.commits?.length > 0) {
     console.log(
       `SANDBOX COMMITS: ${result.commits.map((commit) => shortSha(commit.sha)).join(", ")}`,
     );

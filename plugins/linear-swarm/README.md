@@ -101,6 +101,7 @@ If [Every Inc's compound-engineering plugin](https://github.com/EveryInc/compoun
 | `--dry-run` | off | Run scope + test design only, write shared specs to `/tmp/linear-swarm-tests`, then stop before worker fan-out |
 | `--skip-codex` | off | Skip external Codex review and synthesize bundled or CE findings locally |
 | `--manual-confirm` | off | Force an explicit confirmation gate even when the scope audit is clean |
+| `--hitl=off\|on-error` | `off` | On sandbox worker failure, either stop immediately or hand off to interactive recovery |
 
 `--worker=daytona` is still accepted as a deprecated alias for `--worker=sandbox` so older prompts do not break.
 
@@ -117,6 +118,7 @@ When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the res
 1. **Scope + Quality Audit** — Read Linear (project or parent issue), quality-audit every work item, auto-continue on clean scope, block only on risky audit or `--manual-confirm`
 2. **Test Design** — Orchestrator writes test specs per ticket before any agent spawns
 3. **Fan-Out** — One agent per work item, in worktree OR sandbox
+   When `--hitl=on-error` is active, sandbox worker failures hand off to `swarm-hitl` instead of just dying.
 4. **Review** — CE `workflows:review` + `codex:rescue --fresh`
 5. **Fix-Up Loop** — reuse same agent with review findings; sandbox branches stay local after sync-back
 6. **Structural Smoke** — `scripts/verify_refactor.py` against baseline + real framework dispatch
@@ -129,6 +131,7 @@ When you use `--worker=sandbox`, Phase 1 runs in a Vercel Sandbox, syncs the res
 
 - **Linear as source of truth** — CE reads from `docs/brainstorms/` on disk; this reads Linear tickets (team, mobile, multi-user)
 - **Sandcastle + Vercel Sandbox workers** — run cheap-tier models via Vercel AI Gateway while syncing results back onto normal local branches
+- **Sandcastle HITL fallback** — failed sandbox runs can hand off to an interactive recovery session on the same branch
 - **Cross-code/ops prod verify** — Phase 9 catches ops-config regressions (missing env vars, feature flags) that every structural test will miss
 
 ## Attribution
