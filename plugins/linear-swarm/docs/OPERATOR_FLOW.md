@@ -119,3 +119,12 @@ That split matters:
 - Vercel auth gates sandbox execution.
 
 If one layer is missing, Codex can still inspect the repo, but the nested swarm run will stop at that boundary.
+
+## Auth Troubleshooting
+
+| Auth Layer | Failure Symptom | Fix Path |
+|---|---|---|
+| Claude | `claude` exits with auth error or "not logged in" | Run `claude login`; verify `ANTHROPIC_API_KEY` is set |
+| GitHub | Push or PR creation returns `403` / `Permission denied` | Check `gh auth status`; re-auth with `gh auth login` |
+| Linear | `linear-issue` / `linear-comment` returns `401 Unauthorized` | Regenerate Linear API key; update `LINEAR_API_KEY` env var |
+| Vercel Sandbox | `sandbox-worker` fails with `403` or sandbox not created | Verify `VERCEL_TOKEN` is set and has sandbox scope |
