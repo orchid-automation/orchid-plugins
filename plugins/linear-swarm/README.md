@@ -24,7 +24,7 @@ Before running `/linear-swarm:linear-swarm`, set these:
 
 | Env var / setup | Required | Purpose |
 |---|---|---|
-| `LINEAR_API_KEY` or Linear MCP configured | yes | Read project + issues |
+| `LINEAR_API_KEY` | yes | Unattended Linear reads, comments, and state transitions |
 | `ANTHROPIC_API_KEY` (or Max subscription) | yes | Orchestrator Claude |
 | `GH_TOKEN` / `GITHUB_TOKEN` or `gh auth login` | yes | Push branches + open PRs |
 | clean git working tree | yes | Sandcastle branches from the local checkout |
@@ -34,6 +34,8 @@ Before running `/linear-swarm:linear-swarm`, set these:
 | logged-in Vercel CLI + linked `.vercel/project.json` | sandbox only | The worker can reuse your local Vercel CLI token and linked project metadata |
 
 The plugin's `SessionStart` hook prints a preflight checklist. The `UserPromptSubmit` hook hard-blocks `/linear-swarm:*` commands when required credentials are missing. Sandbox runtime/auth setup is treated as optional unless you explicitly choose `--worker=sandbox`.
+
+`linear-swarm` now prefers the bundled `linear-issue` / `linear-comment` CLI helpers over Linear MCP so nested Claude runs stay unattended and do not stop for browser OAuth.
 
 ## Graceful enhancement
 

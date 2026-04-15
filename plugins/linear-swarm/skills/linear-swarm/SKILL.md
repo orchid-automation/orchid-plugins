@@ -1,14 +1,14 @@
 ---
 name: linear-swarm
-description: Ship a whole Linear project in one session — fan out parallel agents across git worktrees or Sandcastle-powered Vercel Sandboxes, audit with Codex + specialist reviewers, run structural smoke, sequentially merge PRs, deploy, and verify against live prod. Gracefully delegates to Every's compound-engineering plugin when installed. Use when you have a set of independent, well-specified Linear tickets to execute and ship together.
+description: Ship a whole Linear project in one session — fan out parallel agents across git worktrees or Sandcastle-powered Vercel Sandboxes, audit with Codex + specialist reviewers, run structural smoke, sequentially merge PRs, deploy, and verify against live prod. Gracefully delegates to Every's compound-engineering plugin when installed. Uses the bundled Linear CLI for unattended issue/project reads and workflow updates.
 argument-hint: "<TEAM> <PROJECT_NAME> | <ISSUE-ID>  [--worker=local|sandbox] [--model=<slug>] [--dry-run] [--skip-codex]"
 user-invocable: true
-allowed-tools: Agent, SendMessage, Bash, Read, Write, Edit, Grep, Glob, ToolSearch, Skill, TaskCreate, TaskUpdate, TaskList, mcp__linear__list_issues, mcp__linear__list_projects, mcp__linear__get_issue, mcp__linear__save_issue
+allowed-tools: Agent, SendMessage, Bash, Read, Write, Edit, Grep, Glob, Skill, TaskCreate, TaskUpdate, TaskList
 ---
 
 # Linear Swarm
 
-Execute a Linear project end-to-end in one session using the **parallel fan-out + external review + structural smoke + sequential ship + prod verify** pattern. This skill owns the orchestration — every heavy lifting step delegates to existing primitives (compound-engineering workflows when installed, worktree/sandbox workers, `codex:rescue`, `gh`, Linear MCP, etc.).
+Execute a Linear project end-to-end in one session using the **parallel fan-out + external review + structural smoke + sequential ship + prod verify** pattern. This skill owns the orchestration — every heavy lifting step delegates to existing primitives (compound-engineering workflows when installed, worktree/sandbox workers, `codex:rescue`, `gh`, bundled Linear CLI, etc.).
 
 **Invariant:** every phase is a gate. Don't skip gates.
 
@@ -106,10 +106,13 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
 
 4. **Use `bin/` commands, NEVER write Python scripts.** The plugin ships executables on PATH:
    - `sandbox-worker --repo R --branch B --brief F --commit-msg M` — full sandbox lifecycle
+   - `linear-issue get|children|projects|project-parents|set-state ...` — unattended Linear reads + workflow updates via `LINEAR_API_KEY`
    - `linear-comment --issue ID --body "message"` — post to Linear
    These are one-liners. Do NOT write wrapper scripts, do NOT use base64 encoding, do NOT bake API keys into generated code. All credentials come from env vars automatically.
 
-5. **Use TaskCreate/TaskUpdate** for phase tracking so the user sees visual progress:
+5. **Prefer the bundled Linear CLI over Linear MCP.** If `LINEAR_API_KEY` is available, do all issue/project reads, comments, and state transitions through `linear-issue` + `linear-comment`. This keeps nested/headless runs unattended and avoids browser OAuth prompts. Only consider Linear MCP if the env var is absent and the user explicitly wants an interactive fallback.
+
+6. **Use TaskCreate/TaskUpdate** for phase tracking so the user sees visual progress:
    ```
    TaskCreate("Phase 1: Scope Linear issues")
    TaskUpdate(taskId, status="in_progress")
@@ -117,17 +120,17 @@ Phase 4 — Reviewing (compound-engineering fleet + Codex)
    TaskUpdate(taskId, status="completed")
    ```
 
-6. **Agent descriptions must be human-readable:** `"ACME-101 auth migration"` not `"Run task in worktree for issue"`.
+7. **Agent descriptions must be human-readable:** `"ACME-101 auth migration"` not `"Run task in worktree for issue"`.
 
-7. **Suppress intermediate output.** When calling bin/ scripts, pipe to a log and surface only the summary:
+8. **Suppress intermediate output.** When calling bin/ scripts, pipe to a log and surface only the summary:
    ```
    Bash(command: "sandbox-worker ... > /tmp/worker-SEND-82.log 2>&1 && tail -4 /tmp/worker-SEND-82.log",
         description: "Running sandbox worker for SEND-82")
    ```
 
-8. **The golden rule:** if a tool call's `description` or visible output would confuse someone watching over the user's shoulder, rewrite it.
+9. **The golden rule:** if a tool call's `description` or visible output would confuse someone watching over the user's shoulder, rewrite it.
 
-9. **Post Linear comments at every phase gate.** This creates an audit trail visible to anyone on the team — not just whoever's watching the Claude Code session. Use `mcp__linear__save_comment` from the orchestrator at:
+10. **Post Linear comments at every phase gate.** This creates an audit trail visible to anyone on the team — not just whoever's watching the Claude Code session. Use `linear-comment` from the orchestrator at:
    - Phase 1 complete: `"[scope] Picked up by linear-swarm — worker: <mode>, model: <model>"`
    - Phase 3 complete: `"✓ Worker committed: <hash> — <summary of changes>"`
    - Phase 4 complete: `"[review] Review verdict: READY"` or `"⚠ Review: NEEDS-CHANGES — <finding>"`
@@ -148,18 +151,17 @@ If the first arg matches `[A-Z]+-[0-9]+` (e.g., `PROJ-66`), this is **issue mode
 
 1. Resolve `<TEAM>` + `<PROJECT_NAME>` to a Linear project ID:
    ```
-   mcp__linear__list_projects(team: "<TEAM>")
-   → fuzzy-match project name → projectId
+   linear-issue projects --team "<TEAM>" --query "<PROJECT_NAME>"
+   → fuzzy-match project name from the returned JSON → projectId
    ```
 2. Pull every parent task in the project:
    ```
-   mcp__linear__list_issues(project: projectId, limit: 250)
-   → filter state ∈ {Backlog, Todo, In Progress}
-   → filter parentId IS NULL (parent tasks only)
+   linear-issue project-parents --project-id "<PROJECT_ID>"
+   → already filtered to open top-level issues
    ```
 3. For each parent task, pull its subtasks:
    ```
-   mcp__linear__list_issues(parentId: parent.id)
+   linear-issue children --parent "<PARENT-ID>"
    ```
 4. **Fan-out unit = parent task.** Subtasks are internal context for the agent.
 
@@ -167,11 +169,11 @@ If the first arg matches `[A-Z]+-[0-9]+` (e.g., `PROJ-66`), this is **issue mode
 
 1. Fetch the parent issue:
    ```
-   mcp__linear__get_issue(id: "<ISSUE-ID>")
+   linear-issue get --id "<ISSUE-ID>"
    ```
 2. Fetch all subtasks:
    ```
-   mcp__linear__list_issues(parentId: "<ISSUE-ID>")
+   linear-issue children --parent "<ISSUE-ID>"
    ```
 3. If zero subtasks → abort: "This issue has no subtasks. Use it directly, not through linear-swarm."
 4. **Fan-out unit = subtask.** The parent description is shared context for all agents.
@@ -425,7 +427,7 @@ Sandbox-origin branches remain local after Phase 3. Phase 7 is the first push be
 
 After all PRs open:
 - Print PR URL table
-- Move each Linear issue `Todo|Backlog → In Review` via `mcp__linear__save_issue`
+- Move each Linear issue `Todo|Backlog → In Review` via `linear-issue set-state --id "$id" --state "In Review"`
 - Check `gh pr view <n> --json mergeable` for every PR; flag `CONFLICTING` immediately for pre-emptive rebase
 
 ---
@@ -521,7 +523,7 @@ git pull --ff-only origin main
 
 # Move Linear issues to Done (only if Phase 9 passed)
 for id in <ticket_ids>; do
-  mcp__linear__save_issue(id="$id", state="Done")
+  linear-issue set-state --id "$id" --state "Done"
 done
 ```
 

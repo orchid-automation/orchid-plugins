@@ -146,7 +146,8 @@ check_env "VERCEL_AI_GATEWAY_KEY" "optional"
 if [ -n "$(plugin_env LINEAR_API_KEY)" ]; then
   ok "LINEAR_API_KEY set"
 else
-  warn "LINEAR_API_KEY not set (optional if Linear MCP is configured)"
+  warn "LINEAR_API_KEY not set (linear-swarm will need interactive Linear auth and may stall in nested runs)"
+  blocking_missing=$((blocking_missing + 1))
 fi
 
 if sandbox_auth_ready "$repo_root"; then

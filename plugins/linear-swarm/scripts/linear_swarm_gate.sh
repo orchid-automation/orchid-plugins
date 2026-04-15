@@ -99,6 +99,7 @@ command -v git       >/dev/null 2>&1 || missing+=("git CLI")
 command -v gh        >/dev/null 2>&1 || missing+=("gh CLI (install with: brew install gh)")
 command -v python3   >/dev/null 2>&1 || missing+=("python3")
 [ -n "$repo_root" ] || missing+=("an active git repository checkout")
+[ -n "$(plugin_env LINEAR_API_KEY)" ] || missing+=("LINEAR_API_KEY env var or plugin setting")
 
 if [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
   :

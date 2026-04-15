@@ -13,11 +13,11 @@
 ┌───────────────────────────────────────────────────────────────────────┐
 │  PHASE 0 — SCOPE + QUALITY AUDIT                                       │
 │  ─────────────────────────────────────────────────────────────────    │
-│  mcp__linear__list_projects(team=<TEAM>)                               │
+│  linear-issue projects --team <TEAM> --query <PROJECT_NAME>            │
 │    fuzzy match <PROJECT_NAME> → projectId                              │
-│  mcp__linear__list_issues(project=projectId, parentId=null)            │
+│  linear-issue project-parents --project-id <PROJECT_ID>                │
 │    → parent tasks                                                      │
-│  for each parent: list_issues(parentId=parent.id)                      │
+│  for each parent: linear-issue children --parent <PARENT-ID>           │
 │    → subtasks become agent CONTEXT (not separate work units)           │
 │                                                                        │
 │  Quality audit per parent + subtasks:                                  │

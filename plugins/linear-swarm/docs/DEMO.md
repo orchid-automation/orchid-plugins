@@ -58,8 +58,9 @@ Total: ~15–20 minutes for what normally takes a week.
 
 ```
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   Linear MCP    │   │      gh CLI     │   │  Claude Code    │
-│   (read tickets)│   │  (push/PR/merge)│   │ (orchestrator)  │
+│  LINEAR_API_KEY │   │      gh CLI     │   │  Claude Code    │
+│ (issue/project  │   │  (push/PR/merge)│   │ (orchestrator)  │
+│  reads + states)│   │                 │   │                 │
 └─────────────────┘   └─────────────────┘   └─────────────────┘
          │                     │                     │
          └─────────────────────┼─────────────────────┘

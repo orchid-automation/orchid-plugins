@@ -330,8 +330,8 @@ async function resolveLinearIssueId(linearKey, issueId) {
     },
     body: JSON.stringify({
       query: `
-        query IssueSearch($query: String!) {
-          issueSearch(query: $query, first: 1) {
+        query SearchIssues($term: String!) {
+          searchIssues(term: $term, first: 10) {
             nodes {
               id
               identifier
@@ -340,7 +340,7 @@ async function resolveLinearIssueId(linearKey, issueId) {
         }
       `,
       variables: {
-        query: issueId,
+        term: issueId,
       },
     }),
   });
@@ -350,8 +350,10 @@ async function resolveLinearIssueId(linearKey, issueId) {
   }
 
   const payload = await response.json();
-  const node = payload?.data?.issueSearch?.nodes?.[0];
-  if (node?.identifier === issueId && node?.id) {
+  const node = (payload?.data?.searchIssues?.nodes || []).find(
+    (candidate) => candidate?.identifier === issueId,
+  );
+  if (node?.id) {
     return node.id;
   }
 
